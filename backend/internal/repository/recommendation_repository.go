@@ -46,17 +46,7 @@ func NewRecommendationRepository(db *gorm.DB) RecommendationRepository {
 func (r *recommendationRepository) ListHotActivities(limit, offset int) ([]RecommendationItem, error) {
 	var out []RecommendationItem
 	err := r.db.Table("activities a").
-		Select(`
-			a.id AS activity_id,
-			a.title,
-			a.cover_url,
-			a.category,
-			a.location,
-			a.price,
-			a.enroll_open_at,
-			COALESCE(s.score, 0) AS score,
-			COALESCE(s.rank, 0) AS rank
-		`).
+		Select("a.id AS activity_id, a.title, a.cover_url, a.category, a.location, a.price, a.enroll_open_at, COALESCE(s.score, 0) AS score, COALESCE(s.`rank`, 0) AS `rank`").
 		Joins("LEFT JOIN activity_scores s ON s.activity_id = a.id").
 		Where("a.status = ?", "PUBLISHED").
 		Order("COALESCE(s.score, 0) DESC, a.enroll_count DESC, a.view_count DESC, a.id DESC").
@@ -72,17 +62,7 @@ func (r *recommendationRepository) ListHotActivities(limit, offset int) ([]Recom
 func (r *recommendationRepository) ListFreshActivities(limit int) ([]RecommendationItem, error) {
 	var out []RecommendationItem
 	err := r.db.Table("activities a").
-		Select(`
-			a.id AS activity_id,
-			a.title,
-			a.cover_url,
-			a.category,
-			a.location,
-			a.price,
-			a.enroll_open_at,
-			COALESCE(s.score, 0) AS score,
-			COALESCE(s.rank, 0) AS rank
-		`).
+		Select("a.id AS activity_id, a.title, a.cover_url, a.category, a.location, a.price, a.enroll_open_at, COALESCE(s.score, 0) AS score, COALESCE(s.`rank`, 0) AS `rank`").
 		Joins("LEFT JOIN activity_scores s ON s.activity_id = a.id").
 		Where("a.status = ?", "PUBLISHED").
 		Order("a.created_at DESC, a.id DESC").
@@ -154,36 +134,23 @@ func (r *recommendationRepository) ListSimilarActivitiesBySeed(seedActivityIDs [
 	}
 
 	var out []RecommendationItem
-	err := r.db.Raw(`
-		SELECT
-			a.id AS activity_id,
-			a.title,
-			a.cover_url,
-			a.category,
-			a.location,
-			a.price,
-			a.enroll_open_at,
-			COALESCE(s.score, 0) AS score,
-			COALESCE(s.rank, 0) AS rank
-		FROM (
-			SELECT b.activity_id, COUNT(DISTINCT a.user_id) AS common_users
-			FROM user_behaviors a
-			JOIN user_behaviors b
-			  ON a.user_id = b.user_id
-			 AND a.activity_id IN ?
-			 AND b.activity_id NOT IN ?
-			WHERE a.behavior_type IN ('VIEW','COLLECT','SHARE','CLICK','SEARCH')
-			  AND b.behavior_type IN ('VIEW','COLLECT','SHARE','CLICK','SEARCH')
-			GROUP BY b.activity_id
-			ORDER BY common_users DESC
-			LIMIT ?
-		) cf
-		JOIN activities a ON a.id = cf.activity_id
-		LEFT JOIN activity_scores s ON s.activity_id = a.id
-		WHERE a.status = 'PUBLISHED'
-		ORDER BY cf.common_users DESC, COALESCE(s.score, 0) DESC, a.enroll_count DESC, a.id DESC
-	`, seedActivityIDs, seedActivityIDs, limit).
-		Scan(&out).Error
+	err := r.db.Raw(
+		"SELECT a.id AS activity_id, a.title, a.cover_url, a.category, a.location, a.price, a.enroll_open_at, "+
+			"COALESCE(s.score, 0) AS score, COALESCE(s.`rank`, 0) AS `rank` "+
+			"FROM ("+
+			"SELECT b.activity_id, COUNT(DISTINCT a.user_id) AS common_users "+
+			"FROM user_behaviors a "+
+			"JOIN user_behaviors b ON a.user_id = b.user_id AND a.activity_id IN ? AND b.activity_id NOT IN ? "+
+			"WHERE a.behavior_type IN ('VIEW','COLLECT','SHARE','CLICK','SEARCH') "+
+			"AND b.behavior_type IN ('VIEW','COLLECT','SHARE','CLICK','SEARCH') "+
+			"GROUP BY b.activity_id ORDER BY common_users DESC LIMIT ?"+
+			") cf "+
+			"JOIN activities a ON a.id = cf.activity_id "+
+			"LEFT JOIN activity_scores s ON s.activity_id = a.id "+
+			"WHERE a.status = 'PUBLISHED' "+
+			"ORDER BY cf.common_users DESC, COALESCE(s.score, 0) DESC, a.enroll_count DESC, a.id DESC",
+		seedActivityIDs, seedActivityIDs, limit,
+	).Scan(&out).Error
 	if err != nil {
 		return nil, err
 	}
@@ -196,17 +163,7 @@ func (r *recommendationRepository) ListHotActivitiesByCategories(categories []st
 	}
 	var out []RecommendationItem
 	err := r.db.Table("activities a").
-		Select(`
-			a.id AS activity_id,
-			a.title,
-			a.cover_url,
-			a.category,
-			a.location,
-			a.price,
-			a.enroll_open_at,
-			COALESCE(s.score, 0) AS score,
-			COALESCE(s.rank, 0) AS rank
-		`).
+		Select("a.id AS activity_id, a.title, a.cover_url, a.category, a.location, a.price, a.enroll_open_at, COALESCE(s.score, 0) AS score, COALESCE(s.`rank`, 0) AS `rank`").
 		Joins("LEFT JOIN activity_scores s ON s.activity_id = a.id").
 		Where("a.status = ?", "PUBLISHED").
 		Where("a.category IN ?", categories).

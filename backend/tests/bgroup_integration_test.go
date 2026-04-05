@@ -1,6 +1,6 @@
 //go:build bgroup
 
-// B-group end-to-end black-box tests (enrollment, activity, orders). Independent from integration_test.go (A-group tag `integration`).
+// B-group end-to-end black-box tests (enrollment, activity, orders, recommendations). Independent from integration_test.go (A-group tag `integration`).
 //
 // Prerequisites:
 //   1. Server running: cd backend && go run ./cmd/server
@@ -270,4 +270,77 @@ func TestBGroup_OrderPayment(t *testing.T) {
 }
 func TestBGroup_ExpiredOrderScanStockReplenish(t *testing.T) {
 	t.Skip("ScanExpired 由服务端后台 ticker(5m) 触发，当前无 HTTP/同步入口，黑盒无法稳定断言库存回补；需在暴露运维接口或缩短扫描间隔的测试环境验证")
+}
+
+// --- Recommendations (HTTP on port, seed DB: published activities + seed users) ---
+
+func TestBGroup_RecommendationsHot_Anonymous_ReturnsPublishedList(t *testing.T) {
+	st, body := bgroupGetJSON(bgroupBaseURL+"/recommendations/hot?limit=5&offset=0", "")
+	if st != 200 {
+		t.Fatalf("HTTP %d %v", st, body)
+	}
+	if body["code"].(float64) != 0 {
+		t.Fatalf("code: %v", body["code"])
+	}
+	data, ok := body["data"].(map[string]interface{})
+	if !ok {
+		t.Fatalf("data: %T", body["data"])
+	}
+	list, ok := data["list"].([]interface{})
+	if !ok || len(list) < 1 {
+		t.Fatalf("expect non-empty list from seed PUBLISHED activities, got %v", data["list"])
+	}
+	first := list[0].(map[string]interface{})
+	if _, ok := first["activity_id"]; !ok {
+		t.Fatalf("missing activity_id: %v", first)
+	}
+	if _, ok := first["title"].(string); !ok {
+		t.Fatalf("missing title: %v", first)
+	}
+}
+
+func TestBGroup_Recommendations_Anonymous_StrategyHotRanking(t *testing.T) {
+	st, body := bgroupGetJSON(bgroupBaseURL+"/recommendations?limit=5&offset=0&need_refresh=true", "")
+	if st != 200 {
+		t.Fatalf("HTTP %d %v", st, body)
+	}
+	if s, _ := body["strategy"].(string); s != "hot_ranking" {
+		t.Fatalf("anonymous strategy want hot_ranking, got %v", body["strategy"])
+	}
+	data, _ := body["data"].(map[string]interface{})
+	list, _ := data["list"].([]interface{})
+	if len(list) < 1 {
+		t.Fatalf("expect non-empty list")
+	}
+}
+
+func TestBGroup_Recommendations_LoggedIn_SeedUser_NoBehaviors_StrategyHotRanking(t *testing.T) {
+	token := bgroupLoginAndGetToken(t, "13800000001", "test123456")
+	st, body := bgroupGetJSON(bgroupBaseURL+"/recommendations?limit=5&offset=0&need_refresh=true", token)
+	if st != 200 {
+		t.Fatalf("HTTP %d %v", st, body)
+	}
+	if s, _ := body["strategy"].(string); s != "hot_ranking" {
+		t.Fatalf("seed user without behaviors: strategy want hot_ranking, got %v", body["strategy"])
+	}
+}
+
+func TestBGroup_Recommendations_InvalidLimit_BadRequest(t *testing.T) {
+	st, body := bgroupGetJSON(bgroupBaseURL+"/recommendations?limit=0&offset=0", "")
+	if st != 400 {
+		t.Fatalf("HTTP %d, want 400", st)
+	}
+	if int(body["code"].(float64)) != 1001 {
+		t.Fatalf("code want 1001, got %v", body["code"])
+	}
+}
+
+func TestBGroup_RecommendationsHot_InvalidLimit_BadRequest(t *testing.T) {
+	st, body := bgroupGetJSON(bgroupBaseURL+"/recommendations/hot?limit=101&offset=0", "")
+	if st != 400 {
+		t.Fatalf("HTTP %d, want 400", st)
+	}
+	if int(body["code"].(float64)) != 1001 {
+		t.Fatalf("code want 1001, got %v", body["code"])
+	}
 }
