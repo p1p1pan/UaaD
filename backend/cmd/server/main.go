@@ -37,7 +37,12 @@ func main() {
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
 	// Auto-migrate all known entities
-	if err := db.AutoMigrate(&domain.User{}); err != nil {
+	if err := db.AutoMigrate(
+		&domain.User{},
+		&domain.Activity{},
+		&domain.Enrollment{},
+		&domain.Order{},
+	); err != nil {
 		log.Fatalf("failed to migrate database: %v", err)
 	}
 
@@ -46,6 +51,18 @@ func main() {
 	authSvc := service.NewAuthService(userRepo, cfg.JWTSecret)
 	authHandler := handler.NewAuthHandler(authSvc)
 
+	activityRepo := repository.NewActivityRepository(db)
+	enrollmentRepo := repository.NewEnrollmentRepository(db)
+	orderRepo := repository.NewOrderRepository(db)
+
+	activitySvc := service.NewActivityService(activityRepo)
+	enrollmentSvc := service.NewEnrollmentService(db, enrollmentRepo, activityRepo, orderRepo)
+	orderSvc := service.NewOrderService(orderRepo, activityRepo)
+
+	activityHandler := handler.NewActivityHandler(activitySvc)
+	enrollmentHandler := handler.NewEnrollmentHandler(enrollmentSvc)
+	orderHandler := handler.NewOrderHandler(orderSvc)
+
 	// Rate limiter: 5 registration requests per minute
 	regLimit := middleware.NewIPRateLimiter(rate.Limit(5.0/60.0), 5)
 
@@ -53,11 +70,10 @@ func main() {
 	r := gin.Default()
 
 	r.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "http://localhost:3000"},
+		AllowAllOrigins:  true,
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		ExposeHeaders:    []string{"Content-Length"},
-		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	}))
 
@@ -74,12 +90,31 @@ func main() {
 		{
 			protected.GET("/auth/profile", authHandler.GetCurrentUser)
 		}
+
+		// ── Module Routes ────────────────────────────────────���──
+		handler.RegisterActivityRoutes(v1, activityHandler, cfg.JWTSecret)
+		handler.RegisterEnrollmentRoutes(v1, enrollmentHandler, cfg.JWTSecret)
+		handler.RegisterOrderRoutes(v1, orderHandler, cfg.JWTSecret)
 	}
 
 	// Health check
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+
+	// ── Order Expiry Scanner (every 5 minutes) ─────────────────────────
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			closed, err := orderSvc.ScanExpired()
+			if err != nil {
+				log.Printf("[OrderExpiry] scan error: %v", err)
+			} else if closed > 0 {
+				log.Printf("[OrderExpiry] closed %d expired orders, stock rolled back", closed)
+			}
+		}
+	}()
 
 	log.Printf("Server starting on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {

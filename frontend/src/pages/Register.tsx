@@ -38,8 +38,8 @@ const RegisterPage = () => {
       setSuccess(true);
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || t('auth.errorMsg'));
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || t('auth.errorMsg'));
     } finally {
       setLoading(false);
     }

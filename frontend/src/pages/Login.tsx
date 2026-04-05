@@ -23,11 +23,12 @@ const LoginPage = () => {
 
     try {
       const response = await api.post('/auth/login', { phone, password });
-      login(response.data.token);
+      const { token } = response.data.data;
+      login(token);
       navigate('/dashboard');
     } catch (err) {
-      const error = err as { response?: { data?: { error?: string } } };
-      setError(error.response?.data?.error || t('auth.errorMsg'));
+      const error = err as { response?: { data?: { message?: string } } };
+      setError(error.response?.data?.message || t('auth.errorMsg'));
     } finally {
       setLoading(false);
     }
