@@ -9,9 +9,9 @@ import (
 )
 
 var (
-	ErrOrderNotFound  = errors.New("order not found")
+	ErrOrderNotFound   = errors.New("order not found")
 	ErrOrderNotPending = errors.New("order is not in PENDING status")
-	ErrOrderExpired   = errors.New("order has expired")
+	ErrOrderExpired    = errors.New("order has expired")
 )
 
 // PayResult holds the data returned after a successful payment.

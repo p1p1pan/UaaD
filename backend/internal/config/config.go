@@ -32,12 +32,12 @@ type Config struct {
 	DBPassword string
 	DBName     string
 	// MySQL 连接池（与 sql.DB / GORM 一致，见 ApplyMySQLPool）
-	DBMaxIdleConns      int
-	DBMaxOpenConns      int
-	DBConnMaxLifetime   time.Duration
-	RedisHost   string
-	RedisPort   string
-	KafkaBroker string
+	DBMaxIdleConns    int
+	DBMaxOpenConns    int
+	DBConnMaxLifetime time.Duration
+	RedisHost         string
+	RedisPort         string
+	KafkaBroker       string
 
 	Scoring                    ScoringWeights
 	ScoreRecalcIntervalMinutes int
@@ -48,19 +48,19 @@ type Config struct {
 // falling back to development-friendly defaults.
 func Load() *Config {
 	return &Config{
-		Port:        getEnv("PORT", "8080"),
-		JWTSecret:   getEnv("JWT_SECRET", "uaad-super-secret-key-2026"),
-		DBHost:      getEnv("DB_HOST", "localhost"),
-		DBPort:      getEnv("DB_PORT", "3306"),
-		DBUser:      getEnv("DB_USER", "root"),
-		DBPassword:  getEnv("DB_PASSWORD", "root"),
-		DBName:      getEnv("DB_NAME", "uaad"),
+		Port:              getEnv("PORT", "8080"),
+		JWTSecret:         getEnv("JWT_SECRET", "uaad-super-secret-key-2026"),
+		DBHost:            getEnv("DB_HOST", "localhost"),
+		DBPort:            getEnv("DB_PORT", "3306"),
+		DBUser:            getEnv("DB_USER", "root"),
+		DBPassword:        getEnv("DB_PASSWORD", "root"),
+		DBName:            getEnv("DB_NAME", "uaad"),
 		DBMaxIdleConns:    parseIntEnv("DB_MAX_IDLE_CONNS", 10),
 		DBMaxOpenConns:    parseIntEnv("DB_MAX_OPEN_CONNS", 100),
 		DBConnMaxLifetime: parseDurationEnv("DB_CONN_MAX_LIFETIME", time.Hour),
-		RedisHost:   getEnv("REDIS_HOST", "localhost"),
-		RedisPort:   getEnv("REDIS_PORT", "6379"),
-		KafkaBroker: getEnv("KAFKA_BROKER", "localhost:9092"),
+		RedisHost:         getEnv("REDIS_HOST", "localhost"),
+		RedisPort:         getEnv("REDIS_PORT", "6379"),
+		KafkaBroker:       getEnv("KAFKA_BROKER", "localhost:9092"),
 
 		Scoring: ScoringWeights{
 			ViewWeight:      parseFloatEnv("SCORE_WEIGHT_VIEW", 0.2),

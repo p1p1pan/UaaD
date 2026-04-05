@@ -1,10 +1,10 @@
 package middleware
 
 import (
-	"strings"
 	"github.com/gin-gonic/gin"
 	"github.com/uaad/backend/pkg/jwtutil"
 	"github.com/uaad/backend/pkg/response"
+	"strings"
 )
 
 // JWTAuth returns a gin middleware that validates JWT tokens.

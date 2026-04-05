@@ -70,8 +70,8 @@ func TestActivityStateTransition(t *testing.T) {
 
 func TestPublishedFieldLock(t *testing.T) {
 	tests := []struct {
-		status  string
-		locked  bool
+		status string
+		locked bool
 	}{
 		{"DRAFT", false},
 		{"PREHEAT", false},

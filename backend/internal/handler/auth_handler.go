@@ -83,10 +83,10 @@ func (h *AuthHandler) GetCurrentUser(c *gin.Context) {
 	}
 
 	response.Success(c, gin.H{
-		"user_id":  user.ID,
-		"phone":    user.Phone,
-		"username": user.Username,
-		"role":     role,
+		"user_id":    user.ID,
+		"phone":      user.Phone,
+		"username":   user.Username,
+		"role":       role,
 		"created_at": user.CreatedAt,
 	})
 }
