@@ -986,14 +986,44 @@ erDiagram
 
 ### 4.8 推荐模块 RECOMMEND
 
-#### `POST /behaviors` — 提交用户行为（埋点）
+#### 行为埋点说明（`POST /behaviors` / `POST /behaviors/batch`）
+
+| 项 | 说明 |
+|---|---|
+| **用途** | 采集用户与活动的交互事件，写入 `user_behaviors`，作为推荐（热度、协同过滤等）的数据源；**非**报名/订单等业务事务。 |
+| **认证** | 均需 **Bearer Token**；`user_id` 取自 JWT，**不接受**未登录匿名上报。 |
+| **非阻塞策略** | 服务端应尽快返回；可通过环境变量 `BEHAVIOR_ASYNC_WRITE`（默认 `true`）在进程内异步写库。异步场景下 **HTTP 200 仅表示「请求已被接受」**，不保证此时已落盘；落盘失败应记日志/监控，**不向客户端返回 5xx**（避免埋点故障影响主流程）。 |
+| **参数错误** | `activity_id` 缺失/为 0、`behavior_type` 非法、批量为空/超上限等 → **400** + 统一错误体（§8.2）。 |
+
+**`behavior_type` 枚举**（与 `user_behaviors.behavior_type` / DDL 一致）：
+
+| 取值 | 典型场景 |
+|---|---|
+| `VIEW` | 浏览活动详情、停留时长等（`detail` 可含 `duration_seconds`、`source`） |
+| `COLLECT` | 收藏活动 |
+| `SHARE` | 分享 |
+| `CLICK` | 列表卡片、按钮等点击（与 VIEW 区分） |
+| `SEARCH` | 搜索（`detail` 可含 `keyword`） |
+
+---
+
+#### `POST /behaviors` — 提交用户行为（单条）
 
 | 属性 | 说明 |
 |---|---|
+| **路径** | `/api/v1/behaviors` |
 | **认证** | Need Bearer Token |
-| **策略** | 不阻塞调用方；行为数据写入 Kafka 异步落盘或直接写入 DB（开发环境直接写 DB） |
 
-**请求体：**
+**请求体字段：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `activity_id` | number | 是 | 目标活动 ID，须 > 0 |
+| `behavior_type` | string | 是 | 见上表枚举 |
+| `detail` | object | 否 | 附加维度，自由 JSON（如 `source`、`duration_seconds`、`keyword`） |
+| `timestamp` | number | 否 | 客户端事件发生时间（Unix 毫秒），与 `RECOMMENDATION_DESIGN.md` §7 一致；表字段仍以服务端 `created_at` 为准，本字段可选 |
+
+**请求体示例：**
 ```json
 {
   "activity_id": 3,
@@ -1005,11 +1035,70 @@ erDiagram
 }
 ```
 
+**响应 200（接受上报）：**
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "accepted": true
+  }
+}
+```
+
+**响应 400：** 参数绑定失败、`activity_id` 无效、`behavior_type` 不在枚举内 → `code: 1001`，`message` 为可读说明，`data: null`。
+
 ---
 
 #### `POST /behaviors/batch` — 批量提交行为
 
-> 前端定时打包多个行为一次性发送（每 60s 或积攒 10 条触发）。
+| 属性 | 说明 |
+|---|---|
+| **路径** | `/api/v1/behaviors/batch` |
+| **认证** | Need Bearer Token |
+| **触发建议** | 前端定时 flush（如每 **60s**）或队列满 **10 条** 即发送，减少请求次数。 |
+| **上限** | 单次请求数组长度 **1～100**；超出返回 400。 |
+| **校验策略** | 任一条元素校验失败 → **整批 400**（不部分成功）。 |
+
+**请求体字段：**
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `behaviors` | array | 是 | 每项含 `activity_id`、`behavior_type`、可选 `detail`、可选 `timestamp`（Unix 毫秒，与 `RECOMMENDATION_DESIGN.md` §7 前端队列一致） |
+
+**请求体示例：**
+```json
+{
+  "behaviors": [
+    {
+      "activity_id": 3,
+      "behavior_type": "VIEW",
+      "detail": { "source": "home_feed", "duration_seconds": 12 },
+      "timestamp": 1704067200123
+    },
+    {
+      "activity_id": 7,
+      "behavior_type": "COLLECT",
+      "detail": {},
+      "timestamp": 1704067200456
+    }
+  ]
+}
+```
+
+**响应 200：**
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "accepted": true,
+    "count": 2
+  }
+}
+```
+
+**响应 400：** `behaviors` 缺失、空数组、超过 100 条，或任一元素字段非法 → `code: 1001`。
 
 ---
 
@@ -1076,23 +1165,144 @@ erDiagram
 
 ### 4.9 通知模块 NOTIFICATION
 
+#### 模块说明
+
+| 项 | 说明 |
+|---|---|
+| **用途** | C 端站内信：展示业务结果（报名、订单、提醒等），支持未读角标与标记已读。持久化见 **3.8 节** `notifications` 表；本小节只定义 **读模型 HTTP 接口** 及与写入方的契约。 |
+| **认证** | 本节三条接口均为 **Need Bearer Token**；`user_id` 取自 JWT，仅返回**当前用户**的通知。 |
+| **响应信封** | 成功/失败均遵循 **8.2 节** 统一响应格式（`code` / `message` / `data`）。 |
+| **列表分页** | 与活动列表、报名列表等一致，使用 `data.list` + `data.total` + `data.page` + `data.page_size`（见下文 `GET /notifications`）。 |
+| **本期范围** | 不提供「删除通知」「管理端群发」等接口；若产品后续需要，另开版本增补。 |
+
+#### 通知写入服务（后端内部，`NotificationService`）
+
+四类业务通知的**写入方法已在通知模块实现**（`internal/service/notification_service.go`），均为 **best-effort**：落库失败只记日志，**不向调用方返回错误**，以免拖累报名/订单等主事务。
+
+| 方法 | `type` | `related_id` | 当前调用关系 |
+|---|---|---|---|
+| `NotifyEnrollSuccess(userID, enrollmentID, activityTitle)` | `ENROLL_SUCCESS` | `enrollments.id` | **待接入**：在 `EnrollmentService.Create` 事务提交成功后调用（当前报名主流程未注入通知）。 |
+| `NotifyEnrollFail(userID, enrollmentID, activityTitle)` | `ENROLL_FAIL` | `enrollments.id` | **待接入**：报名/抢票失败、冲正等路径中调用。 |
+| `NotifyOrderExpire(userID, orderID, activityTitle)` | `ORDER_EXPIRE` | `orders.id` | **待接入**：订单过期关单（如 `ScanExpired`）之后调用。 |
+| `NotifyActivityReminder(userID, activityID, activityTitle)` | `ACTIVITY_REMINDER` | `activities.id` | **待接入**：活动提醒定时任务或活动侧逻辑中调用。 |
+
+**状态说明**：通知模块 **HTTP + `NotificationService` 写入方法**已实现；**业务侧调用**（上表「待接入」行）由活动/报名/订单等流程在合适节点注入 `NotificationService` 并调用。`NotifyEnrollSuccess` 与报名服务的接线以 **A/B 组联调**为准（当前默认未在 `enrollment_service` 内调用）。
+
+#### `type` 枚举与 `related_id` 约定
+
+与 **3.8 节** / `DDL.md` 中 `type` 枚举一致。`related_id` 为可选；含义依 `type` 而定，**前端可据此跳转详情**（具体路由由前端与产品约定）。写入语义与 **上一节「通知写入服务」** 表一致。
+
+| `type` | `related_id` 含义（约定） |
+|---|---|
+| `ENROLL_SUCCESS` | 报名记录 `enrollments.id` |
+| `ENROLL_FAIL` | 报名记录 `enrollments.id` |
+| `ORDER_EXPIRE` | 订单 `orders.id` |
+| `ACTIVITY_REMINDER` | 活动 `activities.id`（本实现中 `NotifyActivityReminder` 始终写入该 id） |
+
+> **对接注意**：业务事件与通知应 **单一写入点** 触发，避免同一事件重复插多条；跨组改调用点时同步联调群。
+
 #### `GET /notifications` — 我的通知列表
 
 | 属性 | 说明 |
 |---|---|
+| **路径** | `/api/v1/notifications` |
 | **认证** | Need Bearer Token |
+| **查询参数** | `page`（默认 `1`）、`page_size`（默认 `20`，上限 `100`） |
+| **排序** | 按 `created_at` **降序**（新在前）。 |
+
+**响应 200：** `data` 为分页结构，`list` 中每条为通知对象，字段与 **3.8 节** 表一致（JSON 驼峰命名）：
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| `id` | number | 通知主键 |
+| `user_id` | number | 所属用户（与 JWT 一致） |
+| `title` | string | 标题 |
+| `content` | string | 正文 |
+| `type` | string | 见上表枚举 |
+| `related_id` | number \| null | 业务关联 ID |
+| `is_read` | boolean | 是否已读 |
+| `created_at` | string | ISO8601 / RFC3339 |
+
+**响应 200 示例：**
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "list": [
+      {
+        "id": 12,
+        "user_id": 1,
+        "title": "报名成功",
+        "content": "您已成功报名活动「示例演唱会」，请尽快完成支付。",
+        "type": "ENROLL_SUCCESS",
+        "related_id": 100,
+        "is_read": false,
+        "created_at": "2026-04-05T10:00:00Z"
+      }
+    ],
+    "total": 1,
+    "page": 1,
+    "page_size": 20
+  }
+}
+```
+
+**响应 500：** 服务内部错误 → `code: 5000`（见 8.2 节）。
+
+---
 
 #### `PUT /notifications/:id/read` — 标记已读
 
 | 属性 | 说明 |
 |---|---|
+| **路径** | `/api/v1/notifications/:id/read` |
 | **认证** | Need Bearer Token |
+| **路径参数** | `id`：通知 ID |
+| **请求体** | 无 |
+
+仅当通知存在且 **`user_id` 与当前 JWT 用户一致** 时更新为已读；否则返回 **404**（防枚举、不区分「不存在」与「无权」）。
+
+**响应 200：**
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "id": 12,
+    "is_read": true
+  }
+}
+```
+
+**响应 404：** 无权限或资源不存在 → `code: 1004`（见 8.2 节错误码表）。
+
+**响应 400：** `id` 非合法正整数。
+
+---
 
 #### `GET /notifications/unread-count` — 未读通知数量
 
 | 属性 | 说明 |
 |---|---|
+| **路径** | `/api/v1/notifications/unread-count` |
 | **认证** | Need Bearer Token |
+| **查询参数** | 无 |
+
+统计当前用户 `is_read = false` 的通知条数，供导航角标使用。
+
+**响应 200：**
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "unread_count": 3
+  }
+}
+```
+
+**响应 500：** 服务内部错误 → `code: 5000`。
 
 ---
 

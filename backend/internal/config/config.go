@@ -3,10 +3,12 @@
 package config
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 )
@@ -29,6 +31,10 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
+	// MySQL 连接池（与 sql.DB / GORM 一致，见 ApplyMySQLPool）
+	DBMaxIdleConns      int
+	DBMaxOpenConns      int
+	DBConnMaxLifetime   time.Duration
 	RedisHost   string
 	RedisPort   string
 	KafkaBroker string
@@ -49,6 +55,9 @@ func Load() *Config {
 		DBUser:      getEnv("DB_USER", "root"),
 		DBPassword:  getEnv("DB_PASSWORD", "root"),
 		DBName:      getEnv("DB_NAME", "uaad"),
+		DBMaxIdleConns:    parseIntEnv("DB_MAX_IDLE_CONNS", 10),
+		DBMaxOpenConns:    parseIntEnv("DB_MAX_OPEN_CONNS", 100),
+		DBConnMaxLifetime: parseDurationEnv("DB_CONN_MAX_LIFETIME", time.Hour),
 		RedisHost:   getEnv("REDIS_HOST", "localhost"),
 		RedisPort:   getEnv("REDIS_PORT", "6379"),
 		KafkaBroker: getEnv("KAFKA_BROKER", "localhost:9092"),
@@ -96,6 +105,18 @@ func parseIntEnv(key string, fallback int) int {
 	return v
 }
 
+func parseDurationEnv(key string, fallback time.Duration) time.Duration {
+	s := strings.TrimSpace(os.Getenv(key))
+	if s == "" {
+		return fallback
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return fallback
+	}
+	return d
+}
+
 func parseBoolEnv(key string, fallback bool) bool {
 	s := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
 	if s == "" {
@@ -123,4 +144,11 @@ func (c *Config) MySQLDSN() string {
 		AllowNativePasswords: true,
 	}
 	return mcfg.FormatDSN()
+}
+
+// ApplyMySQLPool 将连接池参数应用到 *sql.DB（服务端、测试、seed 共用同一套 env）。
+func (c *Config) ApplyMySQLPool(sqlDB *sql.DB) {
+	sqlDB.SetMaxIdleConns(c.DBMaxIdleConns)
+	sqlDB.SetMaxOpenConns(c.DBMaxOpenConns)
+	sqlDB.SetConnMaxLifetime(c.DBConnMaxLifetime)
 }

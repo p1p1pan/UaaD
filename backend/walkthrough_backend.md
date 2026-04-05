@@ -80,3 +80,44 @@ WHERE id = ? AND enroll_count < max_capacity AND status IN ('PUBLISHED','SELLING
 go build ./...  → exit 0
 go vet ./...    → exit 0
 ```
+
+---
+
+# B 组后端2：通知 + 行为埋点 + 基础设施
+
+**日期：** 2026-04-05  
+**范围：** 通知 3 个 HTTP 端点 + 行为埋点 2 个端点；配置与 `-tags=bgroup` 黑盒测试  
+**详细文档：** `.agents/workflows/backend/b-group.md`
+
+## 1. 文件变更清单
+
+| 操作 | 文件 | 说明 |
+|---|---|---|
+| 新增 | `domain/notification.go`、`domain/behavior.go` | 实体 |
+| 新增 | `repository/notification_repository.go`、`repository/behavior_repository.go` | 持久化 |
+| 新增 | `service/notification_service.go`、`service/behavior_service.go` | 读接口与 Notify* / 埋点写入 |
+| 新增 | `handler/notification_handler.go`、`handler/notification_routes.go` | 通知路由 |
+| 新增 | `handler/behavior_handler.go`、`handler/behavior_routes.go` | 行为路由 |
+| 新增 | `service/notification_service_test.go`、`service/behavior_service_test.go` | 单元测试 |
+| 新增 | `tests/task_env_test.go` | 共用 TestMain、openTestDB、连接池（integration / stress / bgroup） |
+| 新增 | `tests/bgroup_integration_test.go`、`tests/jwt_test.go`、`tests/response_contract_test.go` | 黑盒（`-tags=bgroup`） |
+| 修改 | `internal/config/config.go` | 连接池 env + `ApplyMySQLPool` |
+| 修改 | `cmd/server/main.go`、`scripts/seed/main.go` | 注册路由 / 连接池与线上一致 |
+
+## 2. 关键设计
+
+- **通知**：HTTP 列表、未读数、已读；`Notify*` 为 best-effort；与业务流接线见 `docs/SYSTEM_DESIGN.md` §4.9。
+- **行为埋点**：单条与批量、参数校验、批量上限；可配置同步/异步写入。
+
+## 3. 验证
+
+```bash
+cd backend
+go test ./internal/service/ -run 'Notification|Behavior' -count=1
+go test -v -tags=bgroup -count=1 ./tests/
+```
+
+```
+go build ./...  → exit 0
+go vet ./...    → exit 0
+```

@@ -34,9 +34,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to get sql.DB: %v", err)
 	}
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+	cfg.ApplyMySQLPool(sqlDB)
 
 	// Auto-migrate all known entities
 	if err := db.AutoMigrate(
@@ -59,14 +57,20 @@ func main() {
 	activityRepo := repository.NewActivityRepository(db)
 	enrollmentRepo := repository.NewEnrollmentRepository(db)
 	orderRepo := repository.NewOrderRepository(db)
+	notifRepo := repository.NewNotificationRepository(db)
+	behaviorRepo := repository.NewBehaviorRepository(db)
 
 	activitySvc := service.NewActivityService(activityRepo)
+	notifSvc := service.NewNotificationService(notifRepo)
 	enrollmentSvc := service.NewEnrollmentService(db, enrollmentRepo, activityRepo, orderRepo)
 	orderSvc := service.NewOrderService(orderRepo, activityRepo)
+	behaviorSvc := service.NewBehaviorService(behaviorRepo)
 
 	activityHandler := handler.NewActivityHandler(activitySvc)
 	enrollmentHandler := handler.NewEnrollmentHandler(enrollmentSvc)
 	orderHandler := handler.NewOrderHandler(orderSvc)
+	notifHandler := handler.NewNotificationHandler(notifSvc)
+	behaviorHandler := handler.NewBehaviorHandler(behaviorSvc, cfg)
 
 	// Rate limiter: 5 registration requests per minute
 	regLimit := middleware.NewIPRateLimiter(rate.Limit(5.0/60.0), 5)
@@ -100,6 +104,8 @@ func main() {
 		handler.RegisterActivityRoutes(v1, activityHandler, cfg.JWTSecret)
 		handler.RegisterEnrollmentRoutes(v1, enrollmentHandler, cfg.JWTSecret)
 		handler.RegisterOrderRoutes(v1, orderHandler, cfg.JWTSecret)
+		handler.RegisterNotificationRoutes(v1, notifHandler, cfg.JWTSecret)
+		handler.RegisterBehaviorRoutes(v1, behaviorHandler, cfg.JWTSecret)
 	}
 
 	// Health check

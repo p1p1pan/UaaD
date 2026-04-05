@@ -26,9 +26,7 @@ func main() {
 	}
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+	cfg.ApplyMySQLPool(sqlDB)
 
 	// AutoMigrate all known models
 	if err := db.AutoMigrate(
