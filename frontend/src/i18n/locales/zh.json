@@ -3,6 +3,7 @@
     "login": "登录",
     "register": "注册",
     "username": "用户名",
+    "usernamePlaceholder": "请输入用户名",
     "phone": "手机号",
     "password": "密码",
     "confirmPassword": "确认密码",
@@ -19,6 +20,7 @@
     "errorMsg": "登录失败，请检查您的凭据。"
   },
   "dashboard": {
+    "brandTitle": "UAAD 平台",
     "title": "控制盘概览",
     "welcome": "欢迎回到 UAAD 平台",
     "overview": "概览",
@@ -58,7 +60,67 @@
   },
   "home": {
     "recommendations": "为您推荐",
-    "sectionEyebrow": "本周热选"
+    "sectionEyebrow": "本周热选",
+    "selectedEyebrow": "精选活动",
+    "selectedTitle": "预留 3 个首页精选活动展示位",
+    "selectedDescription": "这 3 个区块先用本地 mock 图片和内容固定下来，严格对齐 Figma 的交错图文结构，后续再切换到真实活动数据源。",
+    "selectedBadge": "首页精选",
+    "banners": {
+      "masters": {
+        "title": "大师典藏",
+        "subtitle": "沉浸式艺术特展与城市美学现场",
+        "description": "从经典名作到数字光影装置，把首屏第一张轮播固定成更贴近 Figma 节奏的展览型主视觉，用于承接首页高品质内容氛围。",
+        "cta": "查看展览"
+      },
+      "stadium": {
+        "title": "万人现场",
+        "subtitle": "热单巡演与夜场灯海一起开场",
+        "description": "用更高对比度的演出场景承接首页第二张轮播，突出热门演唱会与沉浸式舞台体验，强化平台的爆款活动感知。",
+        "cta": "查看演出"
+      },
+      "sports": {
+        "title": "赛场热浪",
+        "subtitle": "焦点赛事与城市主场热力同步升温",
+        "description": "第三张轮播聚焦体育场景，保留强动势画面与明确行动按钮，让首页内容结构在运动类活动上也保持完整统一。",
+        "cta": "查看赛事"
+      }
+    },
+    "mapEyebrow": "活动联动地图",
+    "mapTitle": "全国活动热力图",
+    "mapDrilldownTitle": "{{province}} 城市热力分布",
+    "mapHint": "悬停查看详情，点击省份下钻",
+    "mapBack": "返回全国地图",
+    "mapLoadingProvince": "正在加载 {{province}} 地图...",
+    "mapLegendLow": "热度较低",
+    "mapLegendHigh": "热度较高",
+    "mapError": "地图资源暂时加载失败，请稍后刷新重试。",
+    "mapTooltipCount": "活动数量：{{count}}",
+    "mapTooltipTopActivity": "热门活动：{{title}}",
+    "mapFallbackTopActivity": "热门活动待更新",
+    "spotlightTagline": "精选活动",
+    "spotlightLocation": "活动地点",
+    "spotlightOpenAt": "报名开启",
+    "spotlightCategoryAction": "浏览更多{{category}}",
+    "selectedItems": {
+      "selectedConcert": {
+        "title": "精选活动 01 · 光束降临沉浸演唱现场",
+        "summary": "大型沉浸式舞美与万人合唱声场同步联动，首版先用固定 mock 内容锁定首页精选活动区的结构、图片比例与文案密度。",
+        "location": "北京 · 国家体育馆",
+        "cta": "查看演唱会"
+      },
+      "selectedSports": {
+        "title": "精选活动 02 · 城市冠军之夜主场对决",
+        "summary": "保留 Figma 中图文交错的第二块精选区结构，突出比赛信息、时间和行动按钮，为后续接入真实热门赛事留出稳定卡槽。",
+        "location": "广州 · 天河体育中心",
+        "cta": "查看赛事"
+      },
+      "selectedExhibition": {
+        "title": "精选活动 03 · 城市夜游特展与限定策展单元",
+        "summary": "第三块精选区继续沿用固定 mock 图片与内容，保证首页在真实推荐接口未接入前依旧维持完整视觉框架与浏览节奏。",
+        "location": "上海 · 西岸艺术中心",
+        "cta": "查看展览"
+      }
+    }
   },
   "activities": {
     "totalProducts": "共 {{count}} 个活动",
@@ -136,7 +198,47 @@
     "previous": "上一张",
     "next": "下一张",
     "previousPage": "上一页",
-    "nextPage": "下一页"
+    "nextPage": "下一页",
+    "switchToEnglish": "切换到英文",
+    "switchToChinese": "切换到中文"
+  },
+  "regions": {
+    "provinces": {
+      "110000": "北京",
+      "120000": "天津",
+      "130000": "河北",
+      "140000": "山西",
+      "150000": "内蒙古",
+      "210000": "辽宁",
+      "220000": "吉林",
+      "230000": "黑龙江",
+      "310000": "上海",
+      "320000": "江苏",
+      "330000": "浙江",
+      "340000": "安徽",
+      "350000": "福建",
+      "360000": "江西",
+      "370000": "山东",
+      "410000": "河南",
+      "420000": "湖北",
+      "430000": "湖南",
+      "440000": "广东",
+      "450000": "广西",
+      "460000": "海南",
+      "500000": "重庆",
+      "510000": "四川",
+      "520000": "贵州",
+      "530000": "云南",
+      "540000": "西藏",
+      "610000": "陕西",
+      "620000": "甘肃",
+      "630000": "青海",
+      "640000": "宁夏",
+      "650000": "新疆",
+      "710000": "台湾",
+      "810000": "香港",
+      "820000": "澳门"
+    }
   },
   "settings": {
     "currentLang": "系统语言"
@@ -191,6 +293,18 @@
       "timeInvalid": "时间校验失败：需满足 开始 < 结束 < 举办时间。",
       "submitFailed": "保存失败，请稍后重试。",
       "submitting": "提交中..."
-    }
+    },
+  "footer": {
+    "brandDescription": "统一聚合演出、赛事、展览与城市活动，帮助用户更快找到下一场值得出发的现场。",
+    "linksTitle": "快速入口",
+    "serviceTitle": "服务说明",
+    "serviceCoverage": "覆盖公开活动发现、搜索、推荐与通知提醒",
+    "serviceHours": "服务时间：09:00 - 21:00",
+    "serviceMail": "服务邮箱：support@uaad.local",
+    "contactTitle": "联系我们",
+    "contactDescription": "如果你希望接入更多票务源、商户活动或协作数据，请通过以下方式联系团队。",
+    "contactMail": "商务合作：business@uaad.local",
+    "contactPhone": "服务热线：400-800-2026"
   }
+}
 }

@@ -1,6 +1,7 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useMemo } from 'react';
 import { PublicHeader } from '../components/public/PublicHeader';
+import { PublicFooter } from '../components/public/PublicFooter';
 import { usePreferredCity } from '../hooks/usePreferredCity';
 
 export interface PublicLayoutContext {
@@ -13,6 +14,7 @@ export default function PublicLayout() {
   const navigate = useNavigate();
   const { city, setCity } = usePreferredCity();
   const initialSearchValue = new URLSearchParams(location.search).get('keyword') ?? '';
+  const isHomeRoute = location.pathname === '/';
 
   const contextValue = useMemo<PublicLayoutContext>(
     () => ({
@@ -29,41 +31,26 @@ export default function PublicLayout() {
       params.set('keyword', nextSearchValue.trim());
     }
 
-    if (city !== 'ALL') {
-      params.set('region', city);
-    }
-
     navigate(`/activities${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
-  const handleCityChange = (nextCity: string) => {
-    setCity(nextCity);
-
-    if (location.pathname === '/activities') {
-      const params = new URLSearchParams(location.search);
-
-      if (nextCity === 'ALL') {
-        params.delete('region');
-      } else {
-        params.set('region', nextCity);
-      }
-
-      navigate(`/activities${params.toString() ? `?${params.toString()}` : ''}`);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-[#fffaf7] text-slate-900">
+    <div className="flex min-h-screen flex-col bg-[#fffaf7] text-slate-900">
       <PublicHeader
         key={`${location.pathname}:${location.search}`}
-        preferredCity={city}
-        onCityChange={handleCityChange}
         initialSearchValue={initialSearchValue}
         onSearchSubmit={handleSearchSubmit}
       />
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 lg:px-6 lg:py-8">
+      <main
+        className={
+          isHomeRoute
+            ? 'w-full flex-1'
+            : 'mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-6 lg:py-8'
+        }
+      >
         <Outlet context={contextValue} />
       </main>
+      <PublicFooter />
     </div>
   );
 }

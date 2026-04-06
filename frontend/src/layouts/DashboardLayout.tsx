@@ -37,7 +37,7 @@ export default function DashboardLayout() {
             <span className="font-bold text-white text-lg">U</span>
           </div>
           <span className="text-xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-            UAAD Platform
+            {t('dashboard.brandTitle')}
           </span>
         </div>
 

@@ -1,4 +1,4 @@
-import { Bell, ChevronRight } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -45,17 +45,16 @@ export function NotificationBell() {
     <button
       type="button"
       onClick={handleClick}
-      className="relative flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-rose-200 hover:text-rose-600"
+      className="relative flex h-12 w-12 items-center justify-center rounded-full border border-rose-100 bg-white text-slate-700 transition hover:border-rose-200 hover:text-rose-600"
       aria-label={t('public.notifications')}
+      title={t('public.notifications')}
     >
       <Bell size={18} />
-      <span className="hidden sm:inline">{t('public.notifications')}</span>
       {displayedCount > 0 ? (
         <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white">
           {displayedCount > 99 ? '99+' : displayedCount}
         </span>
       ) : null}
-      <ChevronRight size={14} className="hidden sm:inline" />
     </button>
   );
 }

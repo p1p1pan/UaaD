@@ -1,136 +1,96 @@
+import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CategoryStrip } from '../components/public/CategoryStrip';
-import { ActivityGridCard } from '../components/public/ActivityGridCard';
+import { listActivities } from '../api/endpoints';
 import { BannerCarousel } from '../components/public/BannerCarousel';
-import { EmptyState } from '../components/public/EmptyState';
-import { LoadingCards } from '../components/public/LoadingCards';
-import { RecommendationList } from '../components/public/RecommendationList';
-import { HOME_SECTION_ORDER } from '../constants/public';
-import { HOME_BANNERS } from '../data/home';
-import { listActivities, getHotRecommendations, getRecommendations } from '../api/endpoints';
-import type {
-  ActivitySearchParams,
-  HomeCategorySection,
-  RecommendationSectionItem,
-} from '../types';
-import type { PublicLayoutContext } from '../layouts/PublicLayout';
+import { HomeCityAtlas } from '../components/public/HomeCityAtlas';
+import { SpotlightActivity } from '../components/public/SpotlightActivity';
+import { HOME_BANNERS, HOME_SELECTED_ACTIVITIES } from '../data/home';
+import type { ActivityListItem } from '../types';
+
+const ENTRY_ANIMATION = {
+  initial: { opacity: 0, y: 28 },
+  whileInView: { opacity: 1, y: 0 },
+  viewport: { once: true, amount: 0.2 },
+  transition: { duration: 0.55, ease: 'easeOut' as const },
+};
 
 export default function HomePage() {
   const { t } = useTranslation();
-  const { preferredCity } = useOutletContext<PublicLayoutContext>();
-  const [recommendations, setRecommendations] = useState<RecommendationSectionItem[]>([]);
-  const [sections, setSections] = useState<HomeCategorySection[]>([]);
+  const prefersReducedMotion = useReducedMotion();
+  const [activities, setActivities] = useState<ActivityListItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
-    const baseSearch: ActivitySearchParams = {
+
+    listActivities({
       keyword: '',
-      region: preferredCity,
+      region: 'ALL',
       artist: '',
       category: 'ALL',
       sort: 'hot',
       page: 1,
-      pageSize: 4,
-    };
-
-    async function load() {
-      try {
-        setIsLoading(true);
-
-        const [recommendationResult, ...sectionResults] = await Promise.all([
-          getRecommendations(4).catch(() => getHotRecommendations(4).then((list) => ({ list, strategy: 'hot_fallback' }))),
-          ...HOME_SECTION_ORDER.map(async (category) => {
-            const result = await listActivities({
-              ...baseSearch,
-              category,
-            });
-
-            return {
-              category,
-              title: t(`categories.${category}`),
-              items: result.list,
-            };
-          }),
-        ]);
-
-        if (!active) {
-          return;
+      pageSize: 120,
+    })
+      .then((result) => {
+        if (active) {
+          setActivities(result.list);
         }
-
-        setRecommendations(recommendationResult.list);
-        setSections(sectionResults.filter((section) => section.items.length > 0));
-      } catch {
-        if (!active) {
-          return;
+      })
+      .catch(() => {
+        if (active) {
+          setActivities([]);
         }
-
-        setRecommendations([]);
-        setSections([]);
-      } finally {
+      })
+      .finally(() => {
         if (active) {
           setIsLoading(false);
         }
-      }
-    }
-
-    load();
+      });
 
     return () => {
       active = false;
     };
-  }, [preferredCity, t]);
+  }, []);
+
+  const animationProps = prefersReducedMotion ? {} : ENTRY_ANIMATION;
 
   return (
-    <div className="space-y-8 pb-10">
-      <section className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <BannerCarousel items={HOME_BANNERS} />
-        <RecommendationList
-          items={recommendations}
-          isLoading={isLoading}
-          title={t('home.recommendations')}
+    <div className="pb-8 lg:pb-10">
+      <section className="w-full border-b border-rose-100 bg-white">
+        <BannerCarousel
+          items={HOME_BANNERS}
+          className="w-full border-b border-rose-100 shadow-none"
+          imageClassName="h-[380px] w-full object-cover md:h-[520px] lg:h-[580px]"
         />
       </section>
 
-      <CategoryStrip />
+      <section className="w-full border-b border-rose-100 bg-[linear-gradient(180deg,#fff8f3_0%,#fff1eb_100%)]">
+        <HomeCityAtlas activities={activities} isLoading={isLoading} />
+      </section>
 
-      {isLoading ? (
-        <LoadingCards count={8} />
-      ) : sections.length === 0 ? (
-        <EmptyState />
-      ) : (
-        sections.map((section) => (
-          <section
-            key={section.category}
-            className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-sm lg:p-8"
-          >
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.25em] text-rose-300">
-                  {t('home.sectionEyebrow')}
-                </p>
-                <h2 className="mt-2 text-3xl font-black text-slate-900">
-                  {section.title}
-                </h2>
-              </div>
-              <Link
-                to={`/activities?category=${section.category}${preferredCity !== 'ALL' ? `&region=${encodeURIComponent(preferredCity)}` : ''}`}
-                className="text-sm font-semibold text-slate-400 transition hover:text-rose-600"
-              >
-                {t('public.viewAll')}
-              </Link>
-            </div>
+      <section className="mx-auto w-full max-w-7xl px-4 py-10 lg:px-6 lg:py-12">
+        <div className="mb-6">
+          <p className="text-sm font-semibold uppercase tracking-[0.26em] text-rose-400">
+            {t('home.selectedEyebrow')}
+          </p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-slate-900">
+            {t('home.selectedTitle')}
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-500 lg:text-base">
+            {t('home.selectedDescription')}
+          </p>
+        </div>
 
-            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {section.items.map((item) => (
-                <ActivityGridCard key={item.id} item={item} />
-              ))}
-            </div>
-          </section>
-        ))
-      )}
+        <div className="space-y-8">
+          {HOME_SELECTED_ACTIVITIES.map((item, index) => (
+            <motion.div key={item.id} {...animationProps}>
+              <SpotlightActivity item={item} mirrored={index % 2 === 1} />
+            </motion.div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

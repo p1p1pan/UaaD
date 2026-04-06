@@ -1,21 +1,17 @@
-import { MapPin, Search, UserCircle2 } from 'lucide-react';
+import { Search, UserCircle2 } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CITY_OPTIONS } from '../../constants/public';
+import LanguageToggle from '../LanguageToggle';
 import { useAuth } from '../../context/AuthContext';
 import { NotificationBell } from './NotificationBell';
 
 interface PublicHeaderProps {
-  preferredCity: string;
-  onCityChange: (city: string) => void;
   initialSearchValue: string;
   onSearchSubmit: (value: string) => void;
 }
 
 export function PublicHeader({
-  preferredCity,
-  onCityChange,
   initialSearchValue,
   onSearchSubmit,
 }: PublicHeaderProps) {
@@ -29,45 +25,25 @@ export function PublicHeader({
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl items-center gap-4 px-4 py-4 lg:px-6">
+    <header className="sticky top-0 z-40 border-b border-rose-100 bg-[#fffaf7]/95 backdrop-blur">
+      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center gap-3 px-4 py-4 lg:flex-nowrap lg:px-6">
         <NavLink to="/" className="flex shrink-0 items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[radial-gradient(circle_at_top,_#ff9cc6,_#ff2d7a_55%,_#ff6a00)] text-white shadow-lg shadow-rose-200">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[radial-gradient(circle_at_top,_#ffb6d0,_#fb7185_55%,_#f97316)] text-white shadow-[0_20px_45px_-24px_rgba(244,63,94,0.7)]">
             <span className="text-xl font-black">U</span>
           </div>
           <div className="hidden sm:block">
             <p className="text-3xl font-black tracking-tight text-rose-600">UAAD</p>
-            <p className="text-xs font-semibold tracking-[0.3em] text-rose-300">
-              {t('public.brandTagline')}
-            </p>
           </div>
         </NavLink>
 
-        <div className="hidden items-center gap-2 lg:flex">
-          <label className="flex items-center gap-2 rounded-full bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700">
-            <MapPin size={16} className="text-slate-400" />
-            <select
-              value={preferredCity}
-              onChange={(event) => onCityChange(event.target.value)}
-              className="appearance-none bg-transparent pr-3 text-sm font-medium outline-none"
-            >
-              {CITY_OPTIONS.map((city) => (
-                <option key={city.value} value={city.value}>
-                  {t(`cities.${city.value}`)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <nav className="hidden items-center gap-1 md:flex">
+        <nav className="order-3 flex w-full items-center gap-2 sm:w-auto lg:order-none">
           <NavLink
             to="/"
             className={({ isActive }) =>
-              `rounded-full px-4 py-2 text-base font-semibold transition ${
+              `rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
                 isActive
-                  ? 'bg-rose-50 text-rose-600'
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-rose-600'
+                  ? 'border-rose-200 bg-white text-rose-600 shadow-sm'
+                  : 'border-transparent bg-white/70 text-slate-700 hover:border-rose-100 hover:text-rose-600'
               }`
             }
           >
@@ -76,10 +52,10 @@ export function PublicHeader({
           <NavLink
             to="/activities"
             className={({ isActive }) =>
-              `rounded-full px-4 py-2 text-base font-semibold transition ${
+              `rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
                 isActive
-                  ? 'bg-rose-50 text-rose-600'
-                  : 'text-slate-700 hover:bg-slate-50 hover:text-rose-600'
+                  ? 'border-rose-200 bg-white text-rose-600 shadow-sm'
+                  : 'border-transparent bg-white/70 text-slate-700 hover:border-rose-100 hover:text-rose-600'
               }`
             }
           >
@@ -89,33 +65,37 @@ export function PublicHeader({
 
         <form
           onSubmit={handleSubmit}
-          className="ml-auto flex min-w-0 flex-1 items-center gap-2 lg:max-w-2xl"
+          className="order-5 flex min-w-0 flex-1 basis-full lg:order-none lg:ml-auto lg:w-[440px] lg:flex-none lg:pl-2"
         >
-          <div className="flex min-w-0 flex-1 items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-4 py-3">
-            <Search size={20} className="shrink-0 text-slate-400" />
-            <input
-              value={searchValue}
-              onChange={(event) => setSearchValue(event.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400 lg:text-base"
-              placeholder={t('public.searchPlaceholder')}
-            />
+          <div className="flex min-w-0 flex-1 items-center overflow-hidden rounded-full border border-slate-300 bg-white shadow-sm">
+            <div className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3">
+              <Search size={18} className="shrink-0 text-slate-400" />
+              <input
+                value={searchValue}
+                onChange={(event) => setSearchValue(event.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                placeholder={t('public.searchPlaceholder')}
+              />
+            </div>
+            <button
+              type="submit"
+              className="shrink-0 border-l border-rose-500 bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+            >
+              {t('public.searchAction')}
+            </button>
           </div>
-          <button
-            type="submit"
-            className="shrink-0 rounded-full bg-rose-500 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-rose-200 transition hover:bg-rose-600 lg:px-8 lg:text-base"
-          >
-            {t('public.searchAction')}
-          </button>
         </form>
 
         <div className="flex shrink-0 items-center gap-2">
+          <LanguageToggle variant="light" />
           <NotificationBell />
           <NavLink
             to={isAuthenticated ? '/app/overview' : '/login'}
-            className="hidden items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-rose-200 hover:text-rose-600 lg:flex"
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-rose-100 bg-white text-slate-700 transition hover:border-rose-200 hover:text-rose-600"
+            aria-label={isAuthenticated ? t('public.myAccount') : t('auth.login')}
+            title={isAuthenticated ? t('public.myAccount') : t('auth.login')}
           >
-            <UserCircle2 size={18} />
-            {isAuthenticated ? t('public.myAccount') : t('auth.login')}
+            <UserCircle2 size={20} />
           </NavLink>
         </div>
       </div>
