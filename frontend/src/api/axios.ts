@@ -1,6 +1,34 @@
 import axios from 'axios';
 import { AUTH_LOGOUT_EVENT } from '../constants/authEvents';
 
+interface BackendEnvelope {
+  code?: number;
+  message?: string;
+  data?: unknown;
+}
+
+export interface ApiBusinessError extends Error {
+  code: number;
+  data?: unknown;
+  isBusinessError: true;
+  response: {
+    status: number;
+    data: BackendEnvelope;
+  };
+}
+
+function createBusinessError(status: number, payload: BackendEnvelope): ApiBusinessError {
+  const error = new Error(payload.message || '业务请求失败') as ApiBusinessError;
+  error.code = payload.code || -1;
+  error.data = payload.data;
+  error.isBusinessError = true;
+  error.response = {
+    status,
+    data: payload,
+  };
+  return error;
+}
+
 const api = axios.create({
   baseURL: 'http://localhost:8080/api/v1',
   headers: {
@@ -24,7 +52,13 @@ api.interceptors.request.use(
 
 // Add a global response interceptor for unified error handling
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const payload = response.data as BackendEnvelope;
+    if (response.status === 200 && payload?.code === 1101) {
+      return Promise.reject(createBusinessError(response.status, payload));
+    }
+    return response;
+  },
   (error) => {
     if (error.response) {
       // Handle 401 Unauthorized
