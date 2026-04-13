@@ -1,12 +1,12 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { listActivities } from '../api/endpoints';
+import { getHotRecommendations } from '../api/endpoints';
 import { BannerCarousel } from '../components/public/BannerCarousel';
 import { HomeCityAtlas } from '../components/public/HomeCityAtlas';
 import { SpotlightActivity } from '../components/public/SpotlightActivity';
-import { HOME_BANNERS, HOME_SELECTED_ACTIVITIES } from '../data/home';
-import type { ActivityListItem } from '../types';
+import { HOME_BANNERS } from '../data/home';
+import type { ActivityListItem, RecommendationSectionItem } from '../types';
 
 const ENTRY_ANIMATION = {
   initial: { opacity: 0, y: 28 },
@@ -19,27 +19,25 @@ export default function HomePage() {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
   const [activities, setActivities] = useState<ActivityListItem[]>([]);
+  const [spotlightItems, setSpotlightItems] = useState<RecommendationSectionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
 
-    listActivities({
-      keyword: '',
-      region: 'ALL',
-      artist: '',
-      category: 'ALL',
-      sort: 'hot',
-      page: 1,
-      pageSize: 120,
-    })
-      .then((result) => {
+    Promise.all([
+      getHotRecommendations(3),
+      getHotRecommendations(120),
+    ])
+      .then(([spotlight, hotList]) => {
         if (active) {
-          setActivities(result.list);
+          setSpotlightItems(spotlight);
+          setActivities(hotList);
         }
       })
       .catch(() => {
         if (active) {
+          setSpotlightItems([]);
           setActivities([]);
         }
       })
@@ -84,7 +82,7 @@ export default function HomePage() {
         </div>
 
         <div className="space-y-8">
-          {HOME_SELECTED_ACTIVITIES.map((item, index) => (
+          {spotlightItems.map((item, index) => (
             <motion.div key={item.id} {...animationProps}>
               <SpotlightActivity item={item} mirrored={index % 2 === 1} />
             </motion.div>

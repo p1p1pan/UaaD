@@ -43,16 +43,3 @@ export interface ProvinceDrilldownState {
   name: string;
   displayName: string;
 }
-
-export interface SelectedActivityMockItem {
-  id: string;
-  titleKey: string;
-  summaryKey: string;
-  imageUrl: string;
-  locationKey: string;
-  openAt: string;
-  href: string;
-  category: ActivityCategory;
-  ctaLabelKey: string;
-  accent: 'rose' | 'sky' | 'orange';
-}

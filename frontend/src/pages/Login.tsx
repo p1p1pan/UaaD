@@ -24,8 +24,10 @@ const LoginPage = () => {
 
     try {
       const authPayload = await loginRequest({ phone, password });
-      const { token } = authPayload;
+      const { token, role, username } = authPayload;
       login(token);
+      localStorage.setItem('user_role', role);
+      localStorage.setItem('username', username);
       const fallbackPath = '/';
       const from = (location.state as { from?: { pathname?: string; search?: string } } | null)?.from;
       const nextPath = from?.pathname
@@ -130,7 +132,11 @@ const LoginPage = () => {
 
         <div className="mt-8 text-center text-slate-500">
           {t('auth.noAccount')}{' '}
-          <Link to="/register" className="font-medium text-rose-500 transition-colors hover:text-rose-600">
+          <Link
+            to="/register"
+            state={location.state ?? undefined}
+            className="font-medium text-rose-500 transition-colors hover:text-rose-600"
+          >
             {t('auth.register')}
           </Link>
         </div>

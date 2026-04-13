@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserPlus, User, Lock, Phone, ArrowRight, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -18,6 +18,7 @@ const RegisterPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +37,7 @@ const RegisterPage = () => {
         password: formData.password,
       });
       setSuccess(true);
-      setTimeout(() => navigate('/login'), 2000);
+      setTimeout(() => navigate('/login', { state: location.state ?? undefined }), 2000);
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(error.response?.data?.message || t('auth.errorMsg'));
@@ -185,7 +186,11 @@ const RegisterPage = () => {
 
         <div className="mt-8 text-center text-slate-500">
           {t('auth.hasAccount')}{' '}
-          <Link to="/login" className="font-medium text-rose-500 transition-colors hover:text-rose-600">
+          <Link
+            to="/login"
+            state={location.state ?? undefined}
+            className="font-medium text-rose-500 transition-colors hover:text-rose-600"
+          >
             {t('auth.signIn')}
           </Link>
         </div>

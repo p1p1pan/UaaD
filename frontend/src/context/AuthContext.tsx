@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
+import { AUTH_LOGOUT_EVENT } from '../constants/authEvents';
 
 interface AuthContextType {
   token: string | null;
@@ -22,7 +23,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setToken(null);
     localStorage.removeItem('token');
+    localStorage.removeItem('user_role');
+    localStorage.removeItem('username');
   };
+
+  useEffect(() => {
+    const handleRemoteLogout = () => {
+      setToken(null);
+      localStorage.removeItem('token');
+      localStorage.removeItem('user_role');
+      localStorage.removeItem('username');
+    };
+
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleRemoteLogout);
+    return () => {
+      window.removeEventListener(AUTH_LOGOUT_EVENT, handleRemoteLogout);
+    };
+  }, []);
 
   const value = {
     token,

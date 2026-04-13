@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { CalendarDays, Clock3, MapPin, Ticket, Users } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { getActivityDetail, getActivityStock } from '../api/endpoints';
+import { createEnrollment, getActivityDetail, getActivityStock, getEnrollmentStatus } from '../api/endpoints';
 import type { ActivityDetail } from '../types';
+import type { ApiBusinessError } from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 import { formatCurrency, formatLongDate } from '../utils/formatters';
 
 type CountdownState = 'upcoming' | 'selling' | 'closed';
@@ -38,6 +40,9 @@ function formatRemain(ms: number) {
 
 export default function ActivityDetailPage() {
   const { t } = useTranslation();
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const activityId = Number(id);
   const [activity, setActivity] = useState<ActivityDetail | null>(null);
@@ -45,6 +50,17 @@ export default function ActivityDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [now, setNow] = useState(Date.now());
+  const [isSubmittingEnrollment, setIsSubmittingEnrollment] = useState(false);
+  const [enrollmentMessage, setEnrollmentMessage] = useState('');
+  const [isQueuePolling, setIsQueuePolling] = useState(false);
+  const queuePollTimerRef = useRef<number | null>(null);
+
+  const clearQueuePolling = () => {
+    if (queuePollTimerRef.current !== null) {
+      window.clearInterval(queuePollTimerRef.current);
+      queuePollTimerRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (!Number.isFinite(activityId)) {
@@ -95,6 +111,13 @@ export default function ActivityDetailPage() {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(
+    () => () => {
+      clearQueuePolling();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!activity) {
@@ -154,6 +177,84 @@ export default function ActivityDetailPage() {
 
   const countdown = getCountdownTarget(activity);
   const remain = formatRemain(countdown.target - now);
+
+  const handleEnroll = async () => {
+    if (!activity) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      navigate('/login', {
+        state: {
+          from: {
+            pathname: location.pathname,
+            search: location.search,
+          },
+        },
+      });
+      return;
+    }
+
+    clearQueuePolling();
+    setIsQueuePolling(false);
+    setIsSubmittingEnrollment(true);
+    setEnrollmentMessage('');
+
+    try {
+      const result = await createEnrollment(activity.id);
+
+      if (result.status === 'SUCCESS') {
+        setEnrollmentMessage(result.orderNo ? `报名成功，订单号：${result.orderNo}` : '报名成功，请前往订单页完成支付。');
+        return;
+      }
+
+      if (result.status === 'QUEUING' && result.enrollmentId) {
+        setEnrollmentMessage(`排队中，当前队列序号：${result.queuePosition}`);
+        setIsQueuePolling(true);
+        let retries = 0;
+        const maxRetries = 45;
+
+        queuePollTimerRef.current = window.setInterval(async () => {
+          retries += 1;
+          if (retries > maxRetries) {
+            clearQueuePolling();
+            setIsQueuePolling(false);
+            setEnrollmentMessage('排队状态查询超时，请稍后在通知中心确认结果。');
+            return;
+          }
+
+          const status = await getEnrollmentStatus(result.enrollmentId).catch(() => null);
+          if (!status) {
+            return;
+          }
+
+          if (status.status === 'SUCCESS') {
+            clearQueuePolling();
+            setIsQueuePolling(false);
+            setEnrollmentMessage(status.orderNo ? `排队成功，订单号：${status.orderNo}` : '排队成功，请继续完成支付。');
+            return;
+          }
+
+          if (status.status === 'FAILED' || status.status === 'CANCELLED') {
+            clearQueuePolling();
+            setIsQueuePolling(false);
+            setEnrollmentMessage('报名失败，请稍后重试。');
+          }
+        }, 4000);
+
+        return;
+      }
+
+      setEnrollmentMessage('报名请求已提交，请稍后查看状态。');
+    } catch (rawError) {
+      const businessError = rawError as Partial<ApiBusinessError>;
+      setEnrollmentMessage(
+        businessError.response?.data?.message ?? '报名失败，请稍后重试。',
+      );
+    } finally {
+      setIsSubmittingEnrollment(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-4 py-8">
@@ -259,12 +360,29 @@ export default function ActivityDetailPage() {
 
           <button
             type="button"
+            onClick={handleEnroll}
             className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-rose-500 px-6 py-3 text-sm font-bold text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60"
-            disabled={countdown.state !== 'selling'}
+            disabled={countdown.state !== 'selling' || isSubmittingEnrollment || isQueuePolling}
           >
             <Ticket size={16} />
-            {countdown.state === 'selling' ? t('activityDetail.enrollNow') : t('activityDetail.enrollUnavailable')}
+            {countdown.state === 'selling'
+              ? isSubmittingEnrollment
+                ? '提交中...'
+                : t('activityDetail.enrollNow')
+              : t('activityDetail.enrollUnavailable')}
           </button>
+          {enrollmentMessage ? (
+            <p
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                enrollmentMessage.includes('失败') || enrollmentMessage.includes('超时')
+                  ? 'border-rose-200 bg-rose-50 text-rose-600'
+                  : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+              }`}
+            >
+              {enrollmentMessage}
+              {isQueuePolling ? '（轮询中）' : ''}
+            </p>
+          ) : null}
         </aside>
       </section>
     </div>
