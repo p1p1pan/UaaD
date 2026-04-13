@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { PenLine, Rocket, PlusCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -15,7 +15,7 @@ export default function MerchantActivitiesPage() {
   const [publishingId, setPublishingId] = useState<number | null>(null);
   const [listError, setListError] = useState('');
   const [publishError, setPublishError] = useState('');
-  const banner = (location.state as { message?: string } | null)?.message ?? '';
+  const banner = useMemo(() => (location.state as { message?: string } | null)?.message ?? '', [location.state]);
 
   useEffect(() => {
     let cancelled = false;

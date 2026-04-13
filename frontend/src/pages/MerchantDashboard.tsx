@@ -13,11 +13,29 @@ export default function MerchantDashboardPage() {
   const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    setLoadError('');
+    let cancelled = false;
+
     listMerchantActivities()
-      .then(setItems)
-      .catch((err) => setLoadError(getRequestErrorMessage(err)))
-      .finally(() => setLoading(false));
+      .then((data) => {
+        if (!cancelled) {
+          setLoadError('');
+          setItems(data);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setLoadError(getRequestErrorMessage(err));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const stats = useMemo(() => {

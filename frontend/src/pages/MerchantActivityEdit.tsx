@@ -63,7 +63,7 @@ export default function MerchantActivityEditPage() {
 
   if (!isActivityIdValid) {
     return (
-      <div className="rounded-3xl border border-slate-700 bg-slate-900/50 p-8 text-slate-300">
+      <div className="rounded-3xl border border-amber-500/40 bg-amber-500/10 p-6 text-amber-100">
         {t('activityDetail.invalidId')}
       </div>
     );

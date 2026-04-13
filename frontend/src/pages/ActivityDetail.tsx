@@ -209,6 +209,7 @@ export default function ActivityDetailPage() {
       }
 
       if (result.status === 'QUEUING' && result.enrollmentId) {
+        const enrollmentId = result.enrollmentId;
         setEnrollmentMessage(`排队中，当前队列序号：${result.queuePosition}`);
         setIsQueuePolling(true);
         let retries = 0;
@@ -223,7 +224,7 @@ export default function ActivityDetailPage() {
             return;
           }
 
-          const status = await getEnrollmentStatus(result.enrollmentId).catch(() => null);
+          const status = await getEnrollmentStatus(enrollmentId).catch(() => null);
           if (!status) {
             return;
           }

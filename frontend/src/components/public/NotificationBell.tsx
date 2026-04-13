@@ -16,7 +16,6 @@ export function NotificationBell() {
 
   const refreshCount = useCallback(() => {
     if (!isAuthenticated) {
-      setCount(0);
       return;
     }
 
@@ -26,6 +25,9 @@ export function NotificationBell() {
   }, [isAuthenticated]);
 
   useEffect(() => {
+    if (!isAuthenticated) {
+      return;
+    }
     refreshCount();
   }, [isAuthenticated, location.pathname, refreshCount]);
 
