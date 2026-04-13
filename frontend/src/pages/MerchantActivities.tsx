@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { PenLine, Rocket, PlusCircle } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -12,23 +12,21 @@ export default function MerchantActivitiesPage() {
   const [items, setItems] = useState<ActivityListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [publishingId, setPublishingId] = useState<number | null>(null);
-  const [banner, setBanner] = useState<string>('');
+  const banner = useMemo(() => (location.state as { message?: string } | null)?.message ?? '', [location.state]);
 
-  useEffect(() => {
-    const message = (location.state as { message?: string } | null)?.message;
-    if (message) {
-      setBanner(message);
-    }
-  }, [location.state]);
-
-  const load = () => {
-    setLoading(true);
+  const fetchItems = () =>
     listMerchantActivities()
       .then(setItems)
       .finally(() => setLoading(false));
+
+  const load = () => {
+    setLoading(true);
+    void fetchItems();
   };
 
-  useEffect(load, []);
+  useEffect(() => {
+    void fetchItems();
+  }, []);
 
   const canPublish = (status: ActivityListItem['status']) => status === 'DRAFT' || status === 'PREHEAT';
 
