@@ -2,7 +2,7 @@
 
 ### Requirement: 文档真理源
 
-仓库必须为长期项目文档定义稳定的真理源位置。
+仓库 MUST 为长期项目文档定义稳定的真理源位置。
 
 #### Scenario: 贡献者需要项目资料
 - **WHEN** 贡献者需要需求、架构、数据库、协作、运行或测试信息
@@ -14,7 +14,7 @@
 
 ### Requirement: AI 资产真理源
 
-仓库必须为团队维护的 AI Prompt、Workflow、Skill 和可复用指南定义稳定的真理源位置。
+仓库 MUST 为团队维护的 AI Prompt、Workflow、Skill 和可复用指南定义稳定的真理源位置。
 
 #### Scenario: 贡献者修改共享 AI 指南
 - **WHEN** 贡献者修改适用于多个工具的共享 AI 行为
@@ -26,7 +26,7 @@
 
 ### Requirement: Prompt 更新顺序
 
-仓库必须记录 Prompt 和 Workflow 变更的必要更新顺序。
+仓库 MUST 记录 Prompt 和 Workflow 变更的必要更新顺序。
 
 #### Scenario: Prompt 变更影响多个工具
 - **WHEN** Prompt 或 Workflow 变更影响多个 AI 工具
@@ -38,7 +38,7 @@
 
 ### Requirement: 跨领域变更使用 OpenSpec 治理
 
-仓库必须使用 OpenSpec 管理非琐碎、跨领域的文档结构或 Prompt 治理变更。
+仓库 MUST 使用 OpenSpec 管理非琐碎、跨领域的文档结构或 Prompt 治理变更。
 
 #### Scenario: 变更影响文档和 AI 入口
 - **WHEN** 某个变更影响多个文档入口或 AI 入口
@@ -50,7 +50,7 @@
 
 ### Requirement: 防止失效引用
 
-仓库必须防止主入口把贡献者或 Agent 引导到不存在的文件。
+仓库 MUST 防止主入口把贡献者或 Agent 引导到不存在的文件。
 
 #### Scenario: 主 AI 指令列出必读文件
 - **WHEN** 主 AI 指令文件列出必读文档
