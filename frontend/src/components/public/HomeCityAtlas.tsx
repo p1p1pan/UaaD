@@ -598,33 +598,35 @@ export function HomeCityAtlas({ activities, isLoading = false }: HomeCityAtlasPr
           />
 
           {/* Title overlay — top-left */}
-          <div className="absolute left-6 top-6 z-20">
-            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-400">
-              {t('home.mapEyebrow')}
-            </p>
-            <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900 lg:text-3xl">
-              {drilldown
-                ? t('home.mapDrilldownTitle', {
-                    province: getProvinceLabel(drilldown.code, drilldown.displayName),
-                  })
-                : t('home.mapTitle')}
-            </h2>
-            <div className="mt-2">
-              {drilldown ? (
-                <button
-                  type="button"
-                  onClick={() => setDrilldown(null)}
-                  className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition hover:text-rose-600"
-                >
-                  <ArrowLeft size={16} />
-                  {t('home.mapBack')}
-                </button>
-              ) : (
-                <div className="hidden items-center gap-1.5 text-sm font-medium text-slate-500 lg:flex">
-                  <MapPinned size={14} className="text-rose-400" />
-                  {t('home.mapHint')}
-                </div>
-              )}
+          <div className="absolute inset-x-0 top-6 z-20 px-4 lg:px-6">
+            <div className="mx-auto max-w-7xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-rose-400">
+                {t('home.mapEyebrow')}
+              </p>
+              <h2 className="mt-1 text-2xl font-black tracking-tight text-slate-900 lg:text-3xl">
+                {drilldown
+                  ? t('home.mapDrilldownTitle', {
+                      province: getProvinceLabel(drilldown.code, drilldown.displayName),
+                    })
+                  : t('home.mapTitle')}
+              </h2>
+              <div className="mt-2">
+                {drilldown ? (
+                  <button
+                    type="button"
+                    onClick={() => setDrilldown(null)}
+                    className="inline-flex items-center gap-2 rounded-full border border-rose-200 bg-white/90 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm backdrop-blur-sm transition hover:text-rose-600"
+                  >
+                    <ArrowLeft size={16} />
+                    {t('home.mapBack')}
+                  </button>
+                ) : (
+                  <div className="hidden items-center gap-1.5 text-sm font-medium text-slate-500 lg:flex">
+                    <MapPinned size={14} className="text-rose-400" />
+                    {t('home.mapHint')}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

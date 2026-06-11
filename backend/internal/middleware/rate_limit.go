@@ -8,6 +8,11 @@ import (
 	"golang.org/x/time/rate"
 )
 
+var localhostIPs = map[string]bool{
+	"127.0.0.1": true,
+	"::1":       true,
+}
+
 // IPRateLimiter stores rate limiters for each IP address.
 type IPRateLimiter struct {
 	ips map[string]*rate.Limiter
@@ -47,9 +52,14 @@ func (i *IPRateLimiter) GetLimiter(ip string) *rate.Limiter {
 }
 
 // RateLimitMiddleware returns a gin middleware that limits requests by IP.
+// Loopback addresses (127.0.0.1, ::1) are exempt from rate limiting.
 func RateLimitMiddleware(limiter *IPRateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
+		if localhostIPs[ip] {
+			c.Next()
+			return
+		}
 		if !limiter.GetLimiter(ip).Allow() {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error": "too many requests, please try again later",

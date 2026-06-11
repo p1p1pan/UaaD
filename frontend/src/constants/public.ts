@@ -22,6 +22,7 @@ export interface CategoryOption {
   labelZh: string;
   labelEn: string;
   icon?: LucideIcon;
+  imageUrl?: string;
 }
 
 export interface SortOption {
@@ -45,14 +46,70 @@ export const CITY_OPTIONS: CityOption[] = [
 
 export const CATEGORY_OPTIONS: CategoryOption[] = [
   { value: 'ALL', labelZh: '全部', labelEn: 'All' },
-  { value: 'CONCERT', labelZh: '演唱会', labelEn: 'Concerts', icon: Mic2 },
-  { value: 'THEATER', labelZh: '话剧歌剧', labelEn: 'Theater', icon: Drama },
-  { value: 'SPORTS', labelZh: '体育', labelEn: 'Sports', icon: Trophy },
-  { value: 'CHILDREN', labelZh: '儿童亲子', labelEn: 'Kids', icon: Baby },
-  { value: 'EXHIBITION', labelZh: '展览休闲', labelEn: 'Exhibitions', icon: GalleryVerticalEnd },
-  { value: 'MUSIC', labelZh: '音乐会', labelEn: 'Orchestras', icon: Music2 },
-  { value: 'DANCE', labelZh: '舞蹈芭蕾', labelEn: 'Dance', icon: Orbit },
-  { value: 'OTHER', labelZh: '其他', labelEn: 'Other', icon: Guitar },
+  {
+    value: 'CONCERT',
+    labelZh: '演唱会',
+    labelEn: 'Concerts',
+    icon: Mic2,
+    imageUrl:
+      'https://images.unsplash.com/photo-1501386761578-eac5c94b800a?auto=format&fit=crop&w=1400&q=80',
+  },
+  {
+    value: 'THEATER',
+    labelZh: '话剧歌剧',
+    labelEn: 'Theater',
+    icon: Drama,
+    imageUrl:
+      'https://images.unsplash.com/photo-1507924538820-ede94a04019d?auto=format&fit=crop&w=1400&q=80',
+  },
+  {
+    value: 'SPORTS',
+    labelZh: '体育',
+    labelEn: 'Sports',
+    icon: Trophy,
+    imageUrl:
+      'https://images.unsplash.com/photo-1547347298-4074fc3086f0?auto=format&fit=crop&w=1400&q=80',
+  },
+  {
+    value: 'CHILDREN',
+    labelZh: '儿童亲子',
+    labelEn: 'Kids',
+    icon: Baby,
+    imageUrl:
+      'https://images.unsplash.com/photo-1516627145497-ae6968895b74?auto=format&fit=crop&w=1400&q=80',
+  },
+  {
+    value: 'EXHIBITION',
+    labelZh: '展览休闲',
+    labelEn: 'Exhibitions',
+    icon: GalleryVerticalEnd,
+    imageUrl:
+      'https://images.unsplash.com/photo-1460661419201-fd4cecdf8a8b?auto=format&fit=crop&w=1400&q=80',
+  },
+  {
+    value: 'MUSIC',
+    labelZh: '音乐会',
+    labelEn: 'Orchestras',
+    icon: Music2,
+    imageUrl:
+      'https://images.unsplash.com/photo-1501612780327-45045538702b?auto=format&fit=crop&w=1400&q=80',
+  },
+  {
+    value: 'DANCE',
+    labelZh: '舞蹈芭蕾',
+    labelEn: 'Dance',
+    icon: Orbit,
+    imageUrl:
+      'https://images.unsplash.com/photo-1515169067868-5387ec356754?auto=format&fit=crop&w=1400&q=80',
+  },
+  {
+    value: 'OTHER',
+    labelZh: '其他',
+    labelEn: 'Other',
+    icon: Guitar,
+    imageUrl:
+      'https://images.unsplash.com/photo-1521334884684-d80222895322?auto=format&fit=crop&w=1400&q=80',
+  },
 ];
 
 export const HOME_CATEGORY_RAIL = CATEGORY_OPTIONS.filter((option) => option.value !== 'ALL').slice(0, 6);

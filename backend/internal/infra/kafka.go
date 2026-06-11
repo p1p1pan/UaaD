@@ -15,7 +15,8 @@ func NewKafkaWriter(cfg *config.Config) *kafka.Writer {
 		Balancer:     &kafka.LeastBytes{},
 		BatchSize:    100,
 		BatchTimeout: 10 * time.Millisecond,
-		Async:        true,
+		WriteTimeout: 5 * time.Second,
+		Async:        false,
 	}
 }
 
@@ -28,5 +29,6 @@ func NewKafkaReader(cfg *config.Config) *kafka.Reader {
 		MinBytes:       1,
 		MaxBytes:       10e6, // 10 MB
 		CommitInterval: time.Second,
+		StartOffset:    kafka.FirstOffset, // read from earliest when no committed offset exists
 	})
 }

@@ -4,6 +4,7 @@ import type {
   ActivityCategory,
   ActivityListItem,
   MerchantActivityInput,
+  MerchantMutationResult,
   ActivitySearchParams,
   ActivitySearchResult,
   ActivityStockSnapshot,
@@ -53,7 +54,7 @@ interface BackendSinglePayload<T> {
   data: T;
 }
 
-interface BackendMerchantMutationResult {
+interface BackendMerchantMutationPayload {
   activity_id: number;
   status: ActivityListItem['status'];
   stock_in_cache?: number;
@@ -297,28 +298,49 @@ export async function listMerchantActivities(): Promise<ActivityListItem[]> {
   return response.data.data.map(normalizeActivity);
 }
 
-export async function createMerchantActivity(payload: MerchantActivityInput): Promise<BackendMerchantMutationResult> {
-  const response = await api.post<BackendSinglePayload<BackendMerchantMutationResult>>(
+function normalizeMerchantMutationResult(
+  payload: BackendMerchantMutationPayload,
+  message: string,
+): MerchantMutationResult {
+  return {
+    activityId: payload.activity_id,
+    status: payload.status,
+    stockInCache: payload.stock_in_cache,
+    message,
+  };
+}
+
+export async function createMerchantActivity(
+  payload: MerchantActivityInput,
+): Promise<MerchantMutationResult> {
+  const response = await api.post<BackendSinglePayload<BackendMerchantMutationPayload>>(
     '/activities',
     toBackendActivityInput(payload),
   );
-  return response.data.data;
+  return normalizeMerchantMutationResult(response.data.data, response.data.message);
 }
 
 export async function updateMerchantActivity(
   id: number,
   payload: MerchantActivityInput,
-): Promise<BackendMerchantMutationResult> {
-  const response = await api.put<BackendSinglePayload<BackendMerchantMutationResult>>(
+): Promise<MerchantMutationResult> {
+  const response = await api.put<BackendSinglePayload<BackendMerchantMutationPayload>>(
     `/activities/${id}`,
     toBackendActivityInput(payload),
   );
-  return response.data.data;
+  return normalizeMerchantMutationResult(response.data.data, response.data.message);
 }
 
-export async function publishMerchantActivity(id: number): Promise<BackendMerchantMutationResult> {
-  const response = await api.put<BackendSinglePayload<BackendMerchantMutationResult>>(
+export async function preheatMerchantActivity(id: number): Promise<MerchantMutationResult> {
+  const response = await api.put<BackendSinglePayload<BackendMerchantMutationPayload>>(
+    `/activities/${id}/preheat`,
+  );
+  return normalizeMerchantMutationResult(response.data.data, response.data.message);
+}
+
+export async function publishMerchantActivity(id: number): Promise<MerchantMutationResult> {
+  const response = await api.put<BackendSinglePayload<BackendMerchantMutationPayload>>(
     `/activities/${id}/publish`,
   );
-  return response.data.data;
+  return normalizeMerchantMutationResult(response.data.data, response.data.message);
 }

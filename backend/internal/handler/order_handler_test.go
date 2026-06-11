@@ -16,17 +16,17 @@ import (
 // ── Stub OrderService ───────────────────────────────────────────────────────
 
 type stubOrderService struct {
-	listResult    []domain.Order
-	listTotal     int64
-	listErr       error
-	detailResult  *domain.Order
-	detailErr     error
-	payResult     *service.PayResult
-	payErr        error
-	lastUserID    uint64
-	lastOrderID   uint64
-	lastPage      int
-	lastPageSize  int
+	listResult   []domain.Order
+	listTotal    int64
+	listErr      error
+	detailResult *domain.Order
+	detailErr    error
+	payResult    *service.PayResult
+	payErr       error
+	lastUserID   uint64
+	lastOrderID  uint64
+	lastPage     int
+	lastPageSize int
 }
 
 func (s *stubOrderService) ListByUser(userID uint64, page, pageSize int) ([]domain.Order, int64, error) {

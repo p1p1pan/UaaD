@@ -17,10 +17,11 @@ import (
 )
 
 var (
-	ErrAlreadyEnrolled   = errors.New("already enrolled for this activity")
-	ErrStockInsufficient = errors.New("stock insufficient")
-	ErrEnrollmentClosed  = errors.New("enrollment window is closed")
-	ErrEnrollNotFound    = errors.New("enrollment not found")
+	ErrAlreadyEnrolled     = errors.New("already enrolled for this activity")
+	ErrStockInsufficient   = errors.New("stock insufficient")
+	ErrEnrollmentClosed    = errors.New("enrollment window is closed")
+	ErrEnrollNotFound      = errors.New("enrollment not found")
+	ErrEnrollNotCancelable = errors.New("enrollment cannot be cancelled")
 )
 
 var orderSeq atomic.Int64
@@ -54,6 +55,7 @@ type EnrollmentService interface {
 	Create(userID, activityID uint64) (*EnrollResult, error)
 	GetStatus(enrollmentID, userID uint64) (*domain.Enrollment, *domain.Activity, *domain.Order, error)
 	ListByUser(userID uint64, page, pageSize int) ([]domain.Enrollment, int64, error)
+	Cancel(ctx context.Context, enrollmentID, userID uint64) error
 }
 
 type enrollmentService struct {
@@ -111,17 +113,35 @@ func (s *enrollmentService) Create(userID, activityID uint64) (*EnrollResult, er
 		return nil, err
 	}
 
+	queuePosInt := int(queuePos)
+	enrollment := &domain.Enrollment{
+		UserID:        userID,
+		ActivityID:    activityID,
+		Status:        "QUEUING",
+		QueuePosition: &queuePosInt,
+		EnrolledAt:    now,
+	}
+	if err := s.enrollRepo.Create(enrollment); err != nil {
+		s.rollbackRedis(ctx, activityID, userID)
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrAlreadyEnrolled
+		}
+		return nil, err
+	}
+
 	// 3. Produce to Kafka — Worker will handle MySQL persistence
 	msg := EnrollmentMessage{
-		UserID:     userID,
-		ActivityID: activityID,
-		QueuePos:   queuePos,
-		Price:      activity.Price,
-		Timestamp:  now.UnixMilli(),
+		EnrollmentID: enrollment.ID,
+		UserID:       userID,
+		ActivityID:   activityID,
+		QueuePos:     queuePos,
+		Price:        activity.Price,
+		Timestamp:    now.UnixMilli(),
 	}
 	payload, err := json.Marshal(msg)
 	if err != nil {
 		s.rollbackRedis(ctx, activityID, userID)
+		_ = s.enrollRepo.UpdateStatus(enrollment.ID, "FAILED")
 		return nil, fmt.Errorf("marshal enrollment message: %w", err)
 	}
 
@@ -131,10 +151,12 @@ func (s *enrollmentService) Create(userID, activityID uint64) (*EnrollResult, er
 	})
 	if err != nil {
 		s.rollbackRedis(ctx, activityID, userID)
+		_ = s.enrollRepo.UpdateStatus(enrollment.ID, "FAILED")
 		return nil, fmt.Errorf("kafka produce: %w", err)
 	}
 
 	return &EnrollResult{
+		EnrollmentID:  enrollment.ID,
 		Status:        "QUEUING",
 		QueuePosition: queuePos,
 	}, nil
@@ -177,4 +199,63 @@ func (s *enrollmentService) ListByUser(userID uint64, page, pageSize int) ([]dom
 		pageSize = 20
 	}
 	return s.enrollRepo.ListByUserID(userID, page, pageSize)
+}
+
+func (s *enrollmentService) Cancel(ctx context.Context, enrollmentID, userID uint64) error {
+	enrollment, err := s.enrollRepo.FindByID(enrollmentID)
+	if err != nil {
+		return ErrEnrollNotFound
+	}
+	if enrollment.UserID != userID {
+		return ErrEnrollNotFound
+	}
+
+	switch enrollment.Status {
+	case "CANCELLED":
+		return nil
+	case "FAILED":
+		return ErrEnrollNotCancelable
+	case "QUEUING":
+		updated, err := s.enrollRepo.UpdateStatusFromQueuing(enrollmentID, userID, "CANCELLED")
+		if err != nil {
+			return err
+		}
+		if !updated {
+			return ErrEnrollNotCancelable
+		}
+		if err := s.stockEngine.Rollback(ctx, enrollment.ActivityID, userID); err != nil {
+			log.Printf("[EnrollmentCancel] Redis rollback failed: enrollment=%d activity=%d user=%d: %v",
+				enrollmentID, enrollment.ActivityID, userID, err)
+		}
+		return nil
+	case "SUCCESS":
+		order, err := s.orderRepo.FindByEnrollmentID(enrollmentID)
+		if err != nil {
+			return ErrEnrollNotCancelable
+		}
+		if order.UserID != userID {
+			return ErrEnrollNotFound
+		}
+		if order.Status != "PENDING" {
+			return ErrEnrollNotCancelable
+		}
+		updated, err := s.orderRepo.UpdateStatusFromPending(order.ID, "CLOSED")
+		if err != nil {
+			return err
+		}
+		if !updated {
+			return ErrEnrollNotCancelable
+		}
+		_ = s.activityRepo.IncrementStock(order.ActivityID)
+		if err := s.stockEngine.Rollback(ctx, order.ActivityID, userID); err != nil {
+			log.Printf("[EnrollmentCancel] Redis rollback failed: order=%d activity=%d user=%d: %v",
+				order.ID, order.ActivityID, userID, err)
+		}
+		if err := s.enrollRepo.UpdateStatus(enrollmentID, "CANCELLED"); err != nil {
+			return err
+		}
+		return nil
+	default:
+		return ErrEnrollNotCancelable
+	}
 }

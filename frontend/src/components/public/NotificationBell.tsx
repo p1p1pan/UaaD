@@ -1,45 +1,18 @@
 import { Bell } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { getUnreadNotificationCount } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
+import { useNotificationCount } from '../../hooks/useNotificationCount';
 
 export function NotificationBell() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
-  const [count, setCount] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-
-    if (!isAuthenticated) {
-      return undefined;
-    }
-
-    getUnreadNotificationCount()
-      .then((value) => {
-        if (active) {
-          setCount(value);
-        }
-      })
-      .catch(() => {
-        if (active) {
-          setCount(0);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [isAuthenticated]);
+  const { count } = useNotificationCount();
 
   const handleClick = () => {
-    navigate(isAuthenticated ? '/app/notifications' : '/login');
+    navigate(isAuthenticated ? '/notifications' : '/login');
   };
-
-  const displayedCount = isAuthenticated ? count : 0;
 
   return (
     <button
@@ -50,9 +23,9 @@ export function NotificationBell() {
       title={t('public.notifications')}
     >
       <Bell size={18} />
-      {displayedCount > 0 ? (
+      {count > 0 ? (
         <span className="absolute -right-1 -top-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[11px] font-bold text-white">
-          {displayedCount > 99 ? '99+' : displayedCount}
+          {count > 99 ? '99+' : count}
         </span>
       ) : null}
     </button>

@@ -12,8 +12,9 @@ import (
 // and injects user_id and role into the gin.Context.
 //
 // Usage:
-//   protected := r.Group("/api/v1", middleware.JWTAuth(secret))
-//   protected.GET("/profile", handler.GetProfile)
+//
+//	protected := r.Group("/api/v1", middleware.JWTAuth(secret))
+//	protected.GET("/profile", handler.GetProfile)
 func JWTAuth(secret string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")

@@ -1,12 +1,14 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { listActivities } from '../api/endpoints';
+import { getHotRecommendations, getRecommendations, listActivities } from '../api/endpoints';
 import { BannerCarousel } from '../components/public/BannerCarousel';
+import { CategoryStrip } from '../components/public/CategoryStrip';
+import { EmptyState } from '../components/public/EmptyState';
 import { HomeCityAtlas } from '../components/public/HomeCityAtlas';
 import { SpotlightActivity } from '../components/public/SpotlightActivity';
-import { HOME_BANNERS, HOME_SELECTED_ACTIVITIES } from '../data/home';
-import type { ActivityListItem } from '../types';
+import { HOME_BANNERS } from '../data/home';
+import type { ActivityListItem, HomeSpotlightItem, RecommendationSectionItem } from '../types';
 
 const ENTRY_ANIMATION = {
   initial: { opacity: 0, y: 28 },
@@ -19,40 +21,80 @@ export default function HomePage() {
   const { t } = useTranslation();
   const prefersReducedMotion = useReducedMotion();
   const [activities, setActivities] = useState<ActivityListItem[]>([]);
+  const [spotlights, setSpotlights] = useState<HomeSpotlightItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
 
-    listActivities({
-      keyword: '',
-      region: 'ALL',
-      artist: '',
-      category: 'ALL',
-      sort: 'hot',
-      page: 1,
-      pageSize: 120,
-    })
-      .then((result) => {
-        if (active) {
-          setActivities(result.list);
+    function toSpotlightItem(item: RecommendationSectionItem | ActivityListItem): HomeSpotlightItem {
+      return {
+        id: item.id,
+        title: item.title,
+        summary:
+          'recommendReason' in item && item.recommendReason
+            ? item.recommendReason
+            : item.description || t('public.emptyDescription'),
+        imageUrl: item.coverUrl,
+        location: item.location,
+        openAt: item.enrollOpenAt,
+        href: `/activity/${item.id}`,
+        category: item.category,
+      };
+    }
+
+    async function load() {
+      try {
+        const activityResultPromise = listActivities({
+          keyword: '',
+          region: 'ALL',
+          artist: '',
+          category: 'ALL',
+          sort: 'hot',
+          page: 1,
+          pageSize: 120,
+        }).catch(() => ({
+          list: [],
+          total: 0,
+          page: 1,
+          pageSize: 120,
+        }));
+
+        const recommendationResultPromise = getRecommendations(3)
+          .then((result) => result.list)
+          .catch(() => getHotRecommendations(3))
+          .catch(() => []);
+
+        const [activityResult, recommendationResult] = await Promise.all([
+          activityResultPromise,
+          recommendationResultPromise,
+        ]);
+
+        if (!active) {
+          return;
         }
-      })
-      .catch(() => {
-        if (active) {
-          setActivities([]);
-        }
-      })
-      .finally(() => {
+
+        setActivities(activityResult.list);
+
+        const preferredSpotlights =
+          recommendationResult.length > 0
+            ? recommendationResult.map(toSpotlightItem)
+            : activityResult.list.slice(0, 3).map(toSpotlightItem);
+
+        setSpotlights(preferredSpotlights);
+      } finally {
         if (active) {
           setIsLoading(false);
         }
-      });
+      }
+    }
+
+    load();
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [t]);
 
   const animationProps = prefersReducedMotion ? {} : ENTRY_ANIMATION;
 
@@ -70,6 +112,10 @@ export default function HomePage() {
         <HomeCityAtlas activities={activities} isLoading={isLoading} />
       </section>
 
+      <section className="w-full">
+        <CategoryStrip />
+      </section>
+
       <section className="mx-auto w-full max-w-7xl px-4 py-10 lg:px-6 lg:py-12">
         <div className="mb-6">
           <p className="text-sm font-semibold uppercase tracking-[0.26em] text-rose-400">
@@ -83,13 +129,20 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="space-y-8">
-          {HOME_SELECTED_ACTIVITIES.map((item, index) => (
-            <motion.div key={item.id} {...animationProps}>
-              <SpotlightActivity item={item} mirrored={index % 2 === 1} />
-            </motion.div>
-          ))}
-        </div>
+        {spotlights.length === 0 && !isLoading ? (
+          <EmptyState
+            title={t('public.emptyTitle')}
+            description={t('home.selectedEmptyDescription')}
+          />
+        ) : (
+          <div className="space-y-8">
+            {spotlights.map((item, index) => (
+              <motion.div key={item.id} {...animationProps}>
+                <SpotlightActivity item={item} mirrored={index % 2 === 1} />
+              </motion.div>
+            ))}
+          </div>
+        )}
       </section>
     </div>
   );

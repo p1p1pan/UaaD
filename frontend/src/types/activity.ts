@@ -65,6 +65,13 @@ export interface MerchantActivityInput {
   activityAt: string;
 }
 
+export interface MerchantMutationResult {
+  activityId: number;
+  status: ActivityStatus;
+  stockInCache?: number;
+  message: string;
+}
+
 export interface ActivitySearchParams {
   keyword: string;
   region: string;

@@ -1,13 +1,13 @@
-# UAAD 系统架构设计文档 v1.0
+# UAAD 系统架构设计文档 v1.1
 # System Architecture Design
 
 **面向范围：** Layer 1（抢票引擎）+ Layer 2（活动平台）+ Layer 3（智能分发）
 
 | 文档属性 | 内容 |
 |---|---|
-| 文档版本 | v1.0 |
-| 编制日期 | 2026-04-01 |
-| 状态 | 正式发布（Released） |
+| 文档版本 | v1.1 |
+| 编制日期 | 2026-04-18 |
+| 状态 | 已按当前代码同步（Synced with Repository） |
 | 替代 | SRS v2.0（本文档在 SRS 基础上进行工程级细化） |
 
 ---
@@ -53,7 +53,7 @@ UAAD 采用 **分层 + 事件驱动** 混合架构：
 │     (缓存 + 原子扣减) │  (异步消息队列)                    │
 ├─────────────────────────────────────────────────────────┤
 │                   数据存储层                              │
-│         SQLite (开发) → MySQL (生产读写分离)              │
+│        MySQL（主链路） + Redis + Kafka + 本地 Mock        │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -61,12 +61,13 @@ UAAD 采用 **分层 + 事件驱动** 混合架构：
 
 | 模块 | 代号 | 职责 | 当前状态 |
 |---|---|---|---|
-| 认证模块 | AUTH | 注册、登录、Token 签发与校验 | α: 基础注册登录已完成 |
-| 活动模块 | ACTIVITY | 活动 CRUD、上架/下架、库存预热 | ❌ 未实现 |
-| 报名模块 | ENROLLMENT | 抢票、排队、订单清算 | ❌ 未实现 |
-| 推荐模块 | RECOMMEND | 用户行为采集、热度评分、个性化推荐 | ❌ 未实现 |
-| 通知模块 | NOTIFICATION | 站内消息、中签通知 | ❌ 未实现 |
-| 网关中间件 | GATEWAY | 鉴权中间件、限流、请求日志 | 部分完成（仅 IP 限流） |
+| 认证模块 | AUTH | 注册、登录、Token 签发与校验 | ✅ 已实现，含 `profile` 查询 |
+| 活动模块 | ACTIVITY | 活动 CRUD、详情、库存查询、商户活动管理 | ✅ 已实现 |
+| 报名模块 | ENROLLMENT | 抢票排队、状态查询、报名列表 | ✅ 已实现，异步入队 |
+| 订单模块 | ORDER | 订单列表、详情、支付、过期关闭 | ✅ 已实现 |
+| 推荐模块 | RECOMMEND | 用户行为采集、热度评分、个性化推荐 | ✅ 已实现，含 Hot + Cold Fill + CF |
+| 通知模块 | NOTIFICATION | 站内消息、未读数、标记已读 | ✅ 已实现 |
+| 网关中间件 | GATEWAY | JWT、Optional JWT、RBAC、限流、Prometheus 指标 | ✅ 已实现 |
 
 ---
 
@@ -74,49 +75,22 @@ UAAD 采用 **分层 + 事件驱动** 混合架构：
 
 ### 2.1 Backend 内部架构（Clean Architecture 变体）
 
-```
+```text
 backend/
-├── cmd/server/main.go          # 入口：依赖注入 + 路由装配
+├── cmd/server/main.go          # 入口：依赖注入、路由装配、后台 goroutine 启动
 ├── internal/
-│   ├── domain/                 # 业务实体（纯数据结构）
-│   │   ├── user.go            # ✅ User 实体
-│   │   ├── activity.go        # ❌ 待新增
-│   │   ├── enrollment.go      # ❌ 待新增
-│   │   ├── order.go           # ❌ 待新增
-│   │   ├── user_behavior.go   # ❌ 待新增
-│   │   └── activity_score.go  # ❌ 待新增
-│   ├── repository/             # 数据访问层（DB 操作抽象）
-│   │   ├── user_repository.go         # ✅
-│   │   ├── activity_repository.go     # ❌
-│   │   ├── enrollment_repository.go   # ❌
-│   │   ├── order_repository.go        # ❌
-│   │   ├── behavior_repository.go     # ❌
-│   │   └── recommendation_repository.go # ❌
-│   ├── service/                # 业务逻辑层（核心业务规则）
-│   │   ├── auth_service.go            # ✅
-│   │   ├── activity_service.go        # ❌
-│   │   ├── enrollment_service.go      # ❌
-│   │   ├── order_worker.go            # ❌ Kafka 消费 Worker
-│   │   └── recommendation_service.go  # ❌
-│   ├── handler/                # HTTP Handler（请求/响应转换）
-│   │   ├── auth_handler.go            # ✅
-│   │   ├── activity_handler.go        # ❌
-│   │   ├── enrollment_handler.go      # ❌
-│   │   └── recommendation_handler.go  # ❌
-│   ├── middleware/             # HTTP中间件
-│   │   ├── rate_limit.go      # ✅ IP 限流
-│   │   ├── auth_middleware.go # ❌ JWT 鉴权中间件
-│   │   └── request_id.go      # ❌ 请求追踪 ID
-│   └── config/                 # 配置管理（环境变量加载）
-│       └── config.go          # ❌
-├── pkg/                        # 公共工具库（可跨模块引用）
-│   ├── response/              # 统一响应格式
-│   ├── jwtutil/               # JWT 工具函数
-│   └── redistool/             # Redis Lua 脚本
-├── migrations/                 # DB 迁移脚本
-│   └── 001_initial_schema.up.sql
-├── scripts/
-│   └── seed.go               # 测试数据填充
+│   ├── config/                 # 环境变量、MySQL 连接池、推荐参数
+│   ├── domain/                 # user/activity/enrollment/order/notification/behavior/activity_score
+│   ├── handler/                # auth/activity/enrollment/order/notification/behavior/recommendation
+│   ├── infra/                  # Redis / Kafka client 封装
+│   ├── middleware/             # JWT、Optional JWT、Role、Rate Limit、Metrics
+│   ├── repository/             # 各业务仓储
+│   ├── service/                # 认证、活动、报名、订单、通知、行为、推荐、库存 Lua
+│   └── worker/                 # EnrollmentWorker（Kafka consumer）
+├── migrations/                 # 001~007 up/down SQL
+├── pkg/                        # response / jwtutil
+├── scripts/                    # seed / gen_jmeter_data
+├── tests/                      # integration / response contract / stress / jmeter
 ├── go.mod
 └── go.sum
 ```
@@ -130,51 +104,30 @@ backend/
 
 ### 2.2 Frontend 组件层级
 
-```
+```text
 frontend/src/
 ├── api/
-│   ├── axios.ts               # ✅ Axios 实例 + 全局拦截器
-│   └── endpoints/             # ❌ 待新增 - 各模块接口定义
-│       ├── auth.ts
-│       ├── activity.ts
-│       ├── enrollment.ts
-│       └── recommendation.ts
-├── context/
-│   └── AuthContext.tsx        # ✅ 认证全局状态
-├── layouts/
-│   └── DashboardLayout.tsx    # ✅ 仪表盘侧边栏布局
-├── pages/
-│   ├── Login.tsx              # ✅
-│   ├── Register.tsx           # ✅
-│   ├── Dashboard.tsx          # ✅ (overview)
-│   ├── Activities.tsx         # 🚧 (需对接真实 API)
-│   ├── Profile.tsx            # 🚧 (需对接真实 API)
-│   ├── Settings.tsx           # 🚧
-│   ├── ActivityDetail.tsx     # ❌ 待新增 - 活动详情+抢票入口
-│   ├── EnrollStatus.tsx       # ❌ 待新增 - 报名排队状态页
-│   ├── Orders.tsx             # ❌ 待新增 - 用户订单列表
-│   └── MerchantDashboard.tsx  # ❌ 待新增 - B端商户控制台
+│   ├── axios.ts               # Axios 实例 + Bearer Token / 401 处理
+│   └── endpoints/             # auth / activities / enrollments / orders / notifications / recommendations
 ├── components/
-│   ├── ProtectedRoute.tsx     # ✅
-│   ├── LanguageToggle.tsx     # ✅
-│   ├── ActivityCard.tsx       # ❌ 待新增 - 活动卡片组件
-│   ├── ActivityCountdown.tsx  # ❌ 待新增 - 抢票倒计时
-│   ├── EnrollButton.tsx       # ❌ 待新增 - 报名/抢票按钮（含排队动画）
-│   ├── RankingTable.tsx       # ❌ 待新增 - 热度排行
-│   └── MerchantForm.tsx       # ❌ 待新增 - 活动创建表单
-├── hooks/                     # ❌ 待新增
-│   ├── useEnrollPoll.ts      # 轮询报名状态
-│   └── useCountdown.ts       # 倒计时 hook
-├── i18n/
-│   └── locales/
-│       ├── zh.json            # ✅ (需扩展新增页面文案)
-│       └── en.json            # ✅
-├── mocks/                     # ✅ (需扩展新模块 Mock)
-│   ├── handlers.ts
-│   └── browser.ts
-├── types/                     # ❌ 待新增 - TypeScript 类型共享
-│   └── index.ts
-└── App.tsx                    # ✅ (需扩展路由)
+│   ├── merchant/              # MerchantNotice / MerchantPageHeader / MerchantStateCard
+│   ├── public/                # BannerCarousel / NotificationBell / RecommendationList / Pagination 等
+│   ├── ActivityCountdown.tsx  # 抢票倒计时
+│   ├── LanguageToggle.tsx     # 中英文切换
+│   ├── MerchantForm.tsx       # 商户活动表单
+│   └── ProtectedRoute.tsx     # 登录与角色保护
+├── constants/                 # 认证事件与公共常量
+├── context/AuthContext.tsx    # 认证全局状态
+├── data/                      # 首页展示数据、地理映射
+├── hooks/                     # 通知数、城市偏好、用户偏好、头像对象 URL
+├── i18n/                      # 配置 + zh/en 词典
+├── layouts/PublicLayout.tsx   # 公共站点布局
+├── mocks/                     # MSW handlers
+├── pages/                     # Home / PublicActivities / ActivityDetail / Orders / Notifications / Merchant*
+├── types/                     # 各模块 TypeScript 类型
+├── utils/                     # auth / formatters / notificationState / activityCountdown 等
+├── App.tsx                    # 路由入口 + 旧路径重定向
+└── main.tsx                   # 启动入口 + 可选 Mock
 ```
 
 > **前端关键规则：**
@@ -186,8 +139,8 @@ frontend/src/
 
 ## 3. 完整数据库 DDL（物理层）
 
-> 以下为 **MySQL 生产级 DDL**，开发环境通过 GORM AutoMigrate 对齐相同结构。
-> SQLite 开发环境字段完全一致，仅移除 MySQL 特有语法（如 `ENUM`、`COMMENT`）。
+> 以下为 **MySQL 主开发链路 DDL**，当前服务端通过 GORM AutoMigrate 对齐同一套实体结构。
+> 仓库中保留的 SQLite 文件仅作为本地样例产物，不再作为当前默认运行链路。
 
 ### 3.1 核心用户表 `users`
 
@@ -709,6 +662,27 @@ erDiagram
 
 ---
 
+#### `PUT /activities/:id/preheat` — 设为预热（B 端）
+
+| 属性 | 说明 |
+|---|---|
+| **认证** | Need Bearer Token (role=MERCHANT) |
+| **业务逻辑** | 仅活动创建者可操作；状态从 `DRAFT` → `PREHEAT`；不触发 Redis 库存预热，仍允许继续编辑库存和报名开始时间 |
+
+**响应 200：**
+```json
+{
+  "code": 0,
+  "message": "活动已进入预热状态",
+  "data": {
+    "activity_id": 1,
+    "status": "PREHEAT"
+  }
+}
+```
+
+---
+
 #### `PUT /activities/:id/publish` — 上架活动（B 端）
 
 | 属性 | 说明 |
@@ -809,10 +783,7 @@ erDiagram
     "status": "SELLING_OUT",
     "enroll_count": 67234,
     "stock_remaining": 12766,
-    "created_by": {
-      "user_id": 10,
-      "username": "相信音乐"
-    }
+    "created_by": 10
   }
 }
 ```
@@ -835,8 +806,7 @@ erDiagram
   "data": {
     "activity_id": 3,
     "stock_remaining": 12766,
-    "max_capacity": 80000,
-    "last_updated": "2026-04-10T10:05:32Z"
+    "max_capacity": 80000
   }
 }
 ```
@@ -876,8 +846,7 @@ erDiagram
   "data": {
     "enrollment_id": 100156,
     "status": "QUEUING",
-    "queue_position": 3482,
-    "estimated_wait_seconds": 30
+    "queue_position": 3482
   }
 }
 ```
@@ -923,8 +892,7 @@ erDiagram
     "activity_title": "五月天 2026 巡回演唱会·上海站",
     "status": "QUEUING",
     "queue_position": 2103,
-    "submitted_at": "2026-04-10T10:00:03Z",
-    "estimated_wait_seconds": 15
+    "submitted_at": "2026-04-10T10:00:03Z"
   }
 }
 ```
@@ -942,6 +910,30 @@ erDiagram
   }
 }
 ```
+
+---
+
+#### `POST /enrollments/:id/cancel` — 取消报名（排队/未支付）
+
+| 属性 | 说明 |
+|---|---|
+| **认证** | Need Bearer Token |
+| **支持状态** | `QUEUING` 或 `SUCCESS + PENDING` 订单 |
+| **副作用** | 关闭未支付订单并回补库存；排队中报名直接回补库存 |
+
+**响应 200：**
+```json
+{
+  "code": 0,
+  "message": "ok",
+  "data": {
+    "enrollment_id": 100156,
+    "status": "CANCELLED"
+  }
+}
+```
+
+**响应 400：** 当前状态不可取消（如已支付/已关闭）
 
 ---
 
@@ -1164,12 +1156,6 @@ erDiagram
 
 ---
 
-#### `GET /recommendations/nearby` — 附近活动（LBS）
-
-> 可选功能，基于 `latitude/longitude` 计算距离，按距离排序。
-
----
-
 ### 4.9 通知模块 NOTIFICATION
 
 #### 模块说明
@@ -1188,9 +1174,9 @@ erDiagram
 
 | 方法 | `type` | `related_id` | 当前调用关系 |
 |---|---|---|---|
-| `NotifyEnrollSuccess(userID, enrollmentID, activityTitle)` | `ENROLL_SUCCESS` | `enrollments.id` | **待接入**：在 `EnrollmentService.Create` 事务提交成功后调用（当前报名主流程未注入通知）。 |
-| `NotifyEnrollFail(userID, enrollmentID, activityTitle)` | `ENROLL_FAIL` | `enrollments.id` | **待接入**：报名/抢票失败、冲正等路径中调用。 |
-| `NotifyOrderExpire(userID, orderID, activityTitle)` | `ORDER_EXPIRE` | `orders.id` | **待接入**：订单过期关单（如 `ScanExpired`）之后调用。 |
+| `NotifyEnrollSuccess(userID, enrollmentID, activityTitle)` | `ENROLL_SUCCESS` | `enrollments.id` | **已接入**：Enrollment Worker 落盘成功后写入。 |
+| `NotifyEnrollFail(userID, enrollmentID, activityTitle)` | `ENROLL_FAIL` | `enrollments.id` | **已接入**：Enrollment Worker 事务失败/补偿路径写入。 |
+| `NotifyOrderExpire(userID, orderID, activityTitle)` | `ORDER_EXPIRE` | `orders.id` | **已接入**：订单过期关单（`ScanExpired`）后写入。 |
 | `NotifyActivityReminder(userID, activityID, activityTitle)` | `ACTIVITY_REMINDER` | `activities.id` | **待接入**：活动提醒定时任务或活动侧逻辑中调用。 |
 
 **状态说明**：通知模块 **HTTP + `NotificationService` 写入方法**已实现；**业务侧调用**（上表「待接入」行）由活动/报名/订单等流程在合适节点注入 `NotificationService` 并调用。`NotifyEnrollSuccess` 与报名服务的接线以 **A/B 组联调**为准（当前默认未在 `enrollment_service` 内调用）。
@@ -1801,8 +1787,8 @@ func Paginated(c *gin.Context, list []interface{}, total int64, page, pageSize i
 
 | 措施 | 实现 |
 |---|---|
-| **CORS** | 仅允许前端域名（当前 `localhost:5173`，生产改为实际域名） |
-| **限流** | IP 级 + 用户级双层限流 |
+| **CORS** | 当前代码为 `AllowAllOrigins: true` 便于联调；生产环境应收紧到前端域名白名单 |
+| **限流** | 当前已实现注册接口 IP 级限流；用户级细粒度限流仍可继续增强 |
 | **SQL 注入** | GORM 参数化查询，不拼接原始 SQL |
 | **XSS 防护** | 前端 React 默认转义；后端返回 JSON 不含 HTML |
 | **输入验证** | Gin `binding` tag + 业务层二次校验 |
@@ -1822,53 +1808,50 @@ func Paginated(c *gin.Context, list []interface{}, total int64, page, pageSize i
 
 ### 10.1 开发环境
 
-```
-本地开发 (你当前的机器):
-├── Go Backend → localhost:8080 (SQLite)
-├── Vite Frontend → localhost:5173 (HMR)
-├── 无 Redis / Kafka (逻辑层用 map + channel 模拟)
-└── MSW Mock (前端非 auth 接口)
+```text
+本地开发（当前仓库默认链路）:
+├── Go Backend → localhost:8080
+├── Vite Frontend → localhost:5173
+├── MySQL → localhost:3306
+├── Redis → localhost:6379
+├── Kafka → localhost:9092
+├── Prometheus → localhost:9090
+├── Grafana → localhost:3000
+└── MSW Mock（`VITE_USE_MOCK=true` 时启用前端 Mock）
 ```
 
-> **说明：** Alpha 阶段仅用 SQLite + 内存模拟中间件是合理的。进入 Beta 前需要引入 Docker Compose。
+> **说明：** 当前后端入口代码直接依赖 MySQL / Redis / Kafka；推荐使用根目录 `docker-compose.yaml` 启动基础设施后再联调。
 
 ### 10.2 Beta 部署（Docker Compose）
 
 ```yaml
-# docker-compose.yml (Beta 阶段)
+# 当前仓库中的 docker-compose.yaml
 services:
-  backend:
-    build: ./backend
-    ports: ["8080:8080"]
-    environment:
-      - DB_HOST=mysql
-      - REDIS_HOST=redis
-      - KAFKA_BROKER=kafka:9092
-    depends_on: [mysql, redis, kafka]
-
-  frontend:
-    build: ./frontend
-    ports: ["80:80"]
-    # Nginx 容器：提供 SPA 静态资源 + API 反向代理
-
   mysql:
     image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: uaad
-    volumes: ["mysql_data:/var/lib/mysql"]
+    ports: ["3306:3306"]
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    ports: ["6379:6379"]
 
   kafka:
-    image: bitnami/kafka:latest
-    # 单节点配置
+    image: apache/kafka:3.7.0
+    ports: ["9092:9092"]
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports: ["9090:9090"]
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports: ["3000:3000"]
 
 volumes:
   mysql_data:
 ```
+
+> 当前 Compose 仅托管基础设施，不包含 backend/frontend 应用容器。
 
 ### 10.3 生产部署（K8s 概要）
 
@@ -1889,25 +1872,10 @@ Kubernetes Cluster:
     └── ELK Stack (日志聚合)
 ```
 
-### 10.4 Dockerfile（后端多阶段构建）
+### 10.4 容器化说明
 
-```dockerfile
-# Stage 1: Build
-FROM golang:1.25-alpine AS builder
-WORKDIR /app
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . .
-RUN CGO_ENABLED=1 GOOS=linux go build -o /app/server ./cmd/server
-
-# Stage 2: Run
-FROM alpine:3.20
-RUN apk --no-cache add ca-certificates sqlite-libs
-WORKDIR /app
-COPY --from=builder /app/server .
-EXPOSE 8080
-CMD ["./server"]
-```
+当前仓库已提交基础设施级 `docker-compose.yaml`，但尚未提交 `backend/` 与 `frontend/` 的应用 Dockerfile。
+如需补齐应用容器化，请以当前 MySQL + Redis + Kafka 依赖为准，不再沿用 SQLite-only 的早期示例。
 
 ---
 
@@ -1915,28 +1883,37 @@ CMD ["./server"]
 
 ### 11.1 路由表
 
-```
-/public
-  ├── /                      # ❌ 公开首页（推广 Banner + 推荐 + 分类入口 + 消息通知）
-  ├── /login                 # ✅ 登录
-  ├── /register              # ✅ 注册
-  └── /activities            # ❌ 活动分类/搜索页 (公开，可查看列表+筛选+搜索)
+```text
+/                         # ✅ 公开首页（PublicLayout）
+/activities               # ✅ 公开活动广场
+/activity/:id             # ✅ 活动详情
+/login                    # ✅ 登录
+/register                 # ✅ 注册
 
-/app (需登录)
-  ├── /app/overview          # ✅ 仪表盘首页 (数据概览)
-  ├── /app/activities        # 🚧 活动列表
-  ├── /app/activity/:id      # ❌ 活动详情 + 抢票按钮
-  ├── /app/enroll-status     # ❌ 报名排队状态（轮询页）
-  ├── /app/orders            # ❌ 我的订单
-  ├── /app/notifications     # ❌ 通知中心
-  ├── /app/profile           # 🚧 个人资料
-  └── /app/settings          # 🚧 设置
+/orders                   # ✅ 需登录
+/orders/:id               # ✅ 需登录
+/enroll-status/:id        # ✅ 需登录
+/notifications            # ✅ 需登录
+/profile                  # ✅ 需登录
+/settings                 # ✅ 需登录
 
-/merchant (需登录, role=MERCHANT)
-  ├── /merchant/dashboard    # ❌ B 端控制台
-  ├── /merchant/activities   # ❌ 我的活动列表
-  ├── /merchant/activities/new    # ❌ 创建活动
-  └── /merchant/activities/:id/edit  # ❌ 编辑活动
+/merchant                 # ✅ 重定向到 /merchant/dashboard
+/merchant/dashboard       # ✅ 需登录 + role=MERCHANT
+/merchant/activities      # ✅ 需登录 + role=MERCHANT
+/merchant/activities/new  # ✅ 需登录 + role=MERCHANT
+/merchant/activities/:id/edit # ✅ 需登录 + role=MERCHANT
+
+/app                      # ✅ 旧路径兼容，重定向到 /
+/app/overview             # ✅ 旧路径兼容，重定向到 /
+/app/activities           # ✅ 旧路径兼容，重定向到 /activities
+/app/orders               # ✅ 旧路径兼容，重定向到 /orders
+/app/orders/:id           # ✅ 旧路径兼容，重定向到 /orders/:id
+/app/notifications        # ✅ 旧路径兼容，重定向到 /notifications
+/app/profile              # ✅ 旧路径兼容，重定向到 /profile
+/app/settings             # ✅ 旧路径兼容，重定向到 /settings
+/app/enroll-status/:id    # ✅ 旧路径兼容，重定向到 /enroll-status/:id
+/dashboard                # ✅ 旧路径兼容，重定向到 /
+*                         # ✅ 兜底重定向到 /
 ```
 
 ### 11.2 数据流总览
@@ -2002,91 +1979,85 @@ CMD ["./server"]
 
 | # | 模块 | 任务 | Done? |
 |---|---|---|---|
-| 1.1 | Infrastructure | 引入 `pkg/response` 统一响应包 + JWT 鉴权中间件 + `internal/config` 配置管理 | ❌ |
-| 1.2 | Infrastructure | 前后端路由对齐：完善 App.tsx 路由 + 新增 ActivityDetail / EnrollStatus / Orders 页面骨架 | ❌ |
-| 1.3 | AUTH | 注册登录端到端联调验证 + `pkg/jwtutil` 提取 JWT 逻辑 + 环境变量 | ❌ |
-| 1.4 | Database | GORM AutoMigrate 补齐所有实体结构 + 初始化 migrations/ 目录 | ❌ |
-| 1.5 | i18n | 为所有新增页面对齐中英文翻译 | ❌ |
+| 1.1 | Infrastructure | `pkg/response` + JWT / Optional JWT + `internal/config` | ✅ |
+| 1.2 | Infrastructure | 前后端路由对齐，补齐公开站点与受保护路由 | ✅ |
+| 1.3 | AUTH | 注册登录联调、`pkg/jwtutil`、环境变量 | ✅ |
+| 1.4 | Database | AutoMigrate + `migrations/001~007` | ✅ |
+| 1.5 | i18n | 核心页面中英文词典接入 | ✅ |
 
 ### Sprint 2: 活动模块 (Week 3-4)
 
 | # | 模块 | 任务 | Done? |
 |---|---|---|---|
-| 2.1 | Domain | 新增 Activity, Enrollment, Order, UserBehavior 实体 | ❌ |
-| 2.2 | Repository | Activity/Enrollment Repository 实现 | ❌ |
-| 2.3 | Service | ActivityService: CRUD + 上架预热逻辑 | ❌ |
-| 2.4 | Handler | ActivityHandler: 所有 Activity API 端点 | ❌ |
-| 2.5 | Frontend | 活动列表/详情/创建活动页面 | ❌ |
-| 2.6 | Frontend | B 端商户控制台页面 | ❌ |
-| 2.7 | Frontend | MSW Mock 扩展（活动/报名模块） | ❌ |
+| 2.1 | Domain | Activity / Enrollment / Order / UserBehavior / Notification / ActivityScore 实体 | ✅ |
+| 2.2 | Repository | Activity / Enrollment / Order / Behavior / Notification Repository | ✅ |
+| 2.3 | Service | ActivityService: CRUD + 发布 + 库存读取 | ✅ |
+| 2.4 | Handler | ActivityHandler + 路由注册 | ✅ |
+| 2.5 | Frontend | 活动列表/详情/商户创建编辑页面 | ✅ |
+| 2.6 | Frontend | 商户控制台与活动管理页 | ✅ |
+| 2.7 | Frontend | MSW 扩展（活动、订单、通知、推荐等） | ✅ |
 
 ### Sprint 3: 抢票引擎 (Week 5-6)
 
 | # | 模块 | 任务 | Done? |
 |---|---|---|---|
-| 3.1 | Redis | 引入 Redis 集成 + 库存预热 Lua 脚本 | ❌ |
-| 3.2 | Enrollment | EnrollmentService: 抢票逻辑 + 限流 | ❌ |
-| 3.3 | Enrollment | 报名 API 端点 + 状态查询 | ❌ |
-| 3.4 | Frontend | 抢票按钮 + 排队动画 + 轮询状态页 | ❌ |
-| 3.5 | Order | 订单创建 + 模拟支付 + 过期清理 | ❌ |
-| 3.6 | Notification | 站内通知 + 中签推送 | ❌ |
-| 3.7 | Kafka | 引入 Kafka + Order Worker 消费 (Beta 阶段) | ❌ |
+| 3.1 | Redis | Redis 集成 + 库存 Lua 引擎 | ✅ |
+| 3.2 | Enrollment | EnrollmentService: 异步排队、重复报名保护 | ✅ |
+| 3.3 | Enrollment | 报名端点、状态查询、我的报名列表 | ✅ |
+| 3.4 | Frontend | 报名状态页与倒计时组件 | ✅ |
+| 3.5 | Order | 订单创建、支付、过期扫描关闭 | ✅ |
+| 3.6 | Notification | 站内通知、未读数、标记已读 | ✅ |
+| 3.7 | Kafka | Kafka 集成 + Enrollment Worker 消费 | ✅ |
 
 ### Sprint 4: 智能分发 (Week 7-8)
 
 | # | 模块 | 任务 | Done? |
 |---|---|---|---|
-| 4.1 | Behavior | 行为埋点 API + user_behaviors 写入 | ❌ |
-| 4.2 | Scoring | 热度评分算法 + activity_scores 表 | ❌ |
-| 4.3 | Recommend | Item-based CF 推荐逻辑 (Go 实现简化版) | ❌ |
-| 4.4 | Frontend | 推荐首页 + 「为你推荐」瀑布流 | ❌ |
-| 4.5 | API | /recommendations + /behaviors 端点 | ❌ |
+| 4.1 | Behavior | 行为埋点 API + 批量写入 | ✅ |
+| 4.2 | Scoring | 热度评分 + `activity_scores` 表 + 定时重算 | ✅ |
+| 4.3 | Recommend | Hot / Cold Fill / CF 混合推荐 | ✅ |
+| 4.4 | Frontend | 首页推荐区、公开活动推荐流 | ✅ |
+| 4.5 | API | `/recommendations`、`/recommendations/hot`、`/behaviors` | ✅ |
 
 ### Sprint 5: 打磨与压测 (Week 9-10)
 
 | # | 模块 | 任务 | Done? |
 |---|---|---|---|
-| 5.1 | Test | JMeter 脚本 + 压测报告 | ❌ |
+| 5.1 | Test | JMeter 脚本 + 压测文档 | ✅ |
 | 5.2 | Test | E2E 测试 (Playwright/Cypress) | ❌ |
-| 5.3 | Infra | Docker Compose 部署配置 | ❌ |
-| 5.4 | Docs | 部署文档 + API 文档 (OpenAPI/Swagger) | ❌ |
+| 5.3 | Infra | Docker Compose 基础设施配置 | ✅ |
+| 5.4 | Docs | 运行、压测、协作文档 | ✅ |
 | 5.5 | Fix | 压测中发现的瓶颈修复 | ❌ |
 
 ---
 
-## 附录 A：当前代码差距分析
+## 附录 A：当前实现快照与剩余事项
 
 ### 后端（Go）
 
-| 已有 | 缺失 |
+| 已有 | 仍可继续增强 |
 |---|---|
-| ✅ User domain + repository + service + handler | ❌ 无 JWT 鉴权中间件（所有路由目前匿名可访问） |
-| ✅ 注册限流中间件 (IP 级) | ❌ 无统一响应格式（直接返回 gin.H） |
-| ✅ SQLite + GORM AutoMigrate (User) | ❌ 无其他实体（Activity, Enrollment, Order 等） |
-| ✅ CORS 配置 | ❌ 无 Redis 集成 |
-| | ❌ 无 Kafka 集成 |
-| | ❌ 无配置管理（JWT secret 硬编码） |
-| | ❌ 无错误码体系（code 字段） |
+| ✅ Auth / Activity / Enrollment / Order / Notification / Behavior / Recommendation 全链路模块 | ⚠️ 缺少请求追踪 ID、中间件级结构化日志等运维增强 |
+| ✅ JWT、Optional JWT、角色鉴权、注册限流、Prometheus 指标 | ⚠️ 当前 CORS 为全开放，生产环境需收紧 |
+| ✅ MySQL + Redis + Kafka 集成，含后台 worker 与过期订单扫描 | ⚠️ 仍可继续补充分布式部署与容错演练 |
+| ✅ `internal/config` 配置管理 + `pkg/response` 统一响应格式 | ⚠️ 默认 `JWT_SECRET` 仍建议在线上强制覆盖 |
 
 ### 前端（React）
 
-| 已有 | 缺失 |
+| 已有 | 仍可继续增强 |
 |---|---|
-| ✅ Vite + React + TypeScript 脚手架 | ❌ 无活动相关页面（列表/详情/抢票） |
-| ✅ AuthContext + ProtectedRoute | ❌ 无 B 端商户页面 |
-| ✅ Axios + 全局 401 拦截器 | ❌ 无 api/endpoints 模块化（当前直接在页面组件中调用） |
-| ✅ Login / Register / Dashboard 页面 | ❌ 无排队动画/轮询组件 |
-| ✅ i18n (zh/en) | ❌ 现有页面文案未完全覆盖 i18n |
-| ✅ Tailwind v4 + Framer Motion | ❌ 无行为埋点逻辑 |
-| ✅ MSW Mock | ❌ 无 TypeScript 全局类型定义 |
+| ✅ 公开首页、活动广场、活动详情、订单、通知、个人中心、商户端页面 | ⚠️ 页面级细节和视觉一致性仍可持续打磨 |
+| ✅ AuthContext + ProtectedRoute + 旧路由兼容重定向 | ⚠️ 仍可补充更完整的端到端测试 |
+| ✅ `api/endpoints` 模块化请求层 + MSW handlers + TypeScript 类型 | ⚠️ 尚未建立 Playwright/Cypress 级前端 E2E |
+| ✅ i18n、Tailwind v4、Framer Motion、业务 hooks | ⚠️ 部分页面仍有进一步抽组件与性能优化空间 |
 
-### 优先级修正项（P0，建议在 Sprint 1 完成）
+### 当前优先项（建议后续版本推进）
 
-1. **JWT 鉴权中间件** — 当前 `/api/v1/activities` 等所有路由都没有鉴权保护，这是安全漏洞
-2. **统一响应格式** — 当前 handler 直接返回 `gin.H`，与 API 契约不符
-3. **配置管理** — JWT secret 硬编码在 `main.go` 中，需抽到环境变量
-4. **API 端点模块化** — 前端 `axios.post('/auth/login')` 应改为 `authAPI.login()`
-5. **路由对齐** — 前端根路由 `/` 跳到 `/app/overview` 但无鉴权，未登录用户应跳到 `/login`
+1. **生产安全收口**：将开放式 CORS、默认 `JWT_SECRET`、本地调试配置切换为生产安全配置。
+2. **E2E 验证补齐**：前端和全链路尚未看到成体系的 Playwright/Cypress 自动化。
+3. **应用容器化**：当前仅基础设施有 Compose，backend/frontend Dockerfile 仍待补齐。
+4. **运维可观测性增强**：可继续增加 request id、结构化日志、告警规则和 dashboard 模板。
+5. **API 文档导出**：若要对外协作，建议在当前契约基础上补 OpenAPI/Swagger 产物。
 
 ---
 
@@ -2098,7 +2069,7 @@ CMD ["./server"]
 | GORM | 团队已有使用经验；AutoMigrate 在开发阶段效率高（生产用原生 SQL） |
 | Redis (Lua) | 原子库存扣减的唯一方案；Redis 单线程保证串行，Lua 保证多条命令原子性 |
 | Kafka | 削峰填谷标准方案；相比 RabbitMQ 吞吐量更高，适合抢票场景 |
-| React Router v6 | 嵌套路由完美匹配 `/app/*` 仪表盘布局 |
+| React Router v7 | 当前仓库实际依赖版本；支持公开站点、商户页与旧路径重定向 |
 | Tailwind v4 | 项目已选定；v4 性能显著提升（原生 Vite 插件） |
 | i18next | 前端国际化标准方案；JSON 字典便于维护 |
 | MSW | 拦截级 Mock 比 Mock Server 更真实；支持 CORS 与真实请求混用 |

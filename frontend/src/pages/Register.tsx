@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { UserPlus, User, Lock, Phone, ArrowRight, Loader2 } from 'lucide-react';
+import { UserPlus, User, Lock, Phone, ArrowLeft, ArrowRight, Loader2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { register as registerRequest } from '../api/endpoints';
 import LanguageToggle from '../components/LanguageToggle';
@@ -18,6 +18,7 @@ const RegisterPage = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +37,7 @@ const RegisterPage = () => {
         password: formData.password,
       });
       setSuccess(true);
-      setTimeout(() => navigate('/login'), 2000);
+      setTimeout(() => navigate('/login', { state: location.state ?? undefined }), 2000);
     } catch (err) {
       const error = err as { response?: { data?: { message?: string } } };
       setError(error.response?.data?.message || t('auth.errorMsg'));
@@ -49,9 +50,17 @@ const RegisterPage = () => {
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-white px-4 py-10">
       <div className="pointer-events-none absolute -left-24 -top-20 h-64 w-64 rounded-full bg-rose-200/50 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-24 -right-20 h-72 w-72 rounded-full bg-pink-100 blur-3xl" />
+      <button
+        type="button"
+        onClick={() => navigate('/')}
+        className="absolute left-6 top-6 z-50 inline-flex items-center gap-2 rounded-full border border-rose-100 bg-white/95 px-4 py-2 text-sm font-semibold text-slate-600 shadow-sm transition hover:border-rose-200 hover:text-rose-600"
+      >
+        <ArrowLeft size={16} />
+        {t('auth.backHome')}
+      </button>
       {/* Language Toggle in Top Right */}
       <div className="absolute top-6 right-6 z-50">
-        <LanguageToggle />
+        <LanguageToggle variant="light" />
       </div>
 
       <motion.div 
@@ -185,7 +194,11 @@ const RegisterPage = () => {
 
         <div className="mt-8 text-center text-slate-500">
           {t('auth.hasAccount')}{' '}
-          <Link to="/login" className="font-medium text-rose-500 transition-colors hover:text-rose-600">
+          <Link
+            to="/login"
+            state={location.state ?? undefined}
+            className="font-medium text-rose-500 transition-colors hover:text-rose-600"
+          >
             {t('auth.signIn')}
           </Link>
         </div>

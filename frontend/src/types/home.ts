@@ -44,6 +44,17 @@ export interface ProvinceDrilldownState {
   displayName: string;
 }
 
+export interface HomeSpotlightItem {
+  id: number;
+  title: string;
+  summary: string;
+  imageUrl: string | null;
+  location: string;
+  openAt: string;
+  href: string;
+  category: ActivityCategory;
+}
+
 export interface SelectedActivityMockItem {
   id: string;
   titleKey: string;

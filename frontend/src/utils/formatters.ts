@@ -45,3 +45,12 @@ export function formatCurrency(value: number) {
 
   return locale === 'en-US' ? `From ${formatted}` : `${formatted}起`;
 }
+
+export function formatExactCurrency(value: number) {
+  return new Intl.NumberFormat(getLocale(), {
+    style: 'currency',
+    currency: 'CNY',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+}

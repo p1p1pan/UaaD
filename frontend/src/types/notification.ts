@@ -11,3 +11,5 @@ export interface NotificationItem {
   isRead: boolean;
   type: 'ENROLL_SUCCESS' | 'ENROLL_FAIL' | 'ORDER_EXPIRE' | 'ACTIVITY_REMINDER';
 }
+
+export type NotificationFilter = 'ALL' | 'UNREAD' | 'READ';

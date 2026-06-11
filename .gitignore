@@ -32,3 +32,52 @@ dist/
 node_modules/
 
 codexDoc
+
+# JMeter 本地生成物（CSV / JTL / HTML 报告 / 日志等，勿提交）
+backend/tests/jmeter/out/
+backend/tests/jmeter/jmeter.log
+backend/jmeter.log
+backend/gen_jmeter_data
+
+homework/
+
+# Local AI tooling compatibility / mirror directories
+# These are treated as local tooling assets unless explicitly promoted into version control.
+/.agent/
+/.amazonq/
+/.augment/
+/.bob/
+/.cline/
+/.clinerules/
+/.codebuddy/
+/.codex/
+/.continue/
+/.cospec/
+/.crush/
+/.cursor/
+/.factory/
+/.forge/
+/.gemini/
+/.iflow/
+/.junie/
+/.kilocode/
+/.kiro/
+/.lingma/
+/.opencode/
+/.pi/
+/.qwen/
+/.roo/
+/.trae/
+/.windsurf/
+
+# Local GitHub AI prompt/skill mirrors
+/.github/prompts/
+/.github/skills/
+
+# Local Claude command / generated skill mirrors
+/.claude/commands/
+/.claude/skills/openspec-apply-change/
+/.claude/skills/openspec-archive-change/
+/.claude/skills/openspec-explore/
+/.claude/skills/openspec-propose/backend/.omc/
+.omc/

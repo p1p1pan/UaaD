@@ -56,6 +56,7 @@ type UpdateActivityReq struct {
 type ActivityService interface {
 	Create(merchantID uint64, req CreateActivityReq) (uint64, error)
 	Update(activityID, merchantID uint64, req UpdateActivityReq) error
+	Preheat(activityID, merchantID uint64) (*domain.Activity, error)
 	Publish(activityID, merchantID uint64) (*domain.Activity, error)
 	List(filter repository.ActivityFilter, page, pageSize int) ([]domain.Activity, int64, error)
 	Detail(id uint64) (*domain.Activity, error)
@@ -199,6 +200,25 @@ func (s *activityService) Update(activityID, merchantID uint64, req UpdateActivi
 	return s.repo.Update(activity)
 }
 
+func (s *activityService) Preheat(activityID, merchantID uint64) (*domain.Activity, error) {
+	activity, err := s.repo.FindByID(activityID)
+	if err != nil {
+		return nil, ErrActivityNotFound
+	}
+	if activity.CreatedBy != merchantID {
+		return nil, ErrNotActivityOwner
+	}
+	if activity.Status != "DRAFT" {
+		return nil, ErrInvalidActivityState
+	}
+
+	activity.Status = "PREHEAT"
+	if err := s.repo.Update(activity); err != nil {
+		return nil, err
+	}
+	return activity, nil
+}
+
 func (s *activityService) Publish(activityID, merchantID uint64) (*domain.Activity, error) {
 	activity, err := s.repo.FindByID(activityID)
 	if err != nil {
@@ -247,9 +267,13 @@ func (s *activityService) Stock(id uint64) (int, int, error) {
 	if err != nil {
 		return 0, 0, ErrActivityNotFound
 	}
-	remaining := activity.MaxCapacity - int(activity.EnrollCount)
-	if remaining < 0 {
-		remaining = 0
+
+	remaining, err := s.stockEngine.GetStock(context.Background(), id)
+	if err != nil {
+		remaining = activity.MaxCapacity - int(activity.EnrollCount)
+		if remaining < 0 {
+			remaining = 0
+		}
 	}
 	return remaining, activity.MaxCapacity, nil
 }

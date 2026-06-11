@@ -5,9 +5,10 @@ import { motion } from 'framer-motion';
 
 interface LanguageToggleProps {
   variant?: 'dark' | 'light';
+  size?: 'default' | 'icon';
 }
 
-const LanguageToggle: React.FC<LanguageToggleProps> = ({ variant = 'dark' }) => {
+const LanguageToggle: React.FC<LanguageToggleProps> = ({ variant = 'dark', size = 'default' }) => {
   const { i18n, t } = useTranslation();
   const currentLanguage = i18n.resolvedLanguage?.startsWith('en') ? 'en' : 'zh';
 
@@ -19,6 +20,26 @@ const LanguageToggle: React.FC<LanguageToggleProps> = ({ variant = 'dark' }) => 
   const isDark = variant === 'dark';
   const nextLanguageLabel =
     currentLanguage === 'zh' ? t('common.switchToEnglish') : t('common.switchToChinese');
+  const isIconOnly = size === 'icon';
+
+  if (isIconOnly) {
+    return (
+      <motion.button
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        onClick={toggleLanguage}
+        aria-label={nextLanguageLabel}
+        title={nextLanguageLabel}
+        className={`relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-colors ${
+          isDark
+            ? 'border-slate-700 bg-slate-800/50 text-slate-200 hover:border-blue-500/50'
+            : 'border-rose-100 bg-white text-slate-600 shadow-sm hover:border-rose-200 hover:text-rose-600'
+        }`}
+      >
+        <Languages size={18} className={isDark ? 'text-blue-500' : 'text-rose-500'} />
+      </motion.button>
+    );
+  }
 
   return (
     <motion.button

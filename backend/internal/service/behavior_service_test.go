@@ -30,7 +30,7 @@ func (s *stubBehaviorRepo) CountByActivityAndType(activityID uint64, behaviorTyp
 }
 
 func TestBehaviorService_Submit_InvalidType(t *testing.T) {
-	svc := NewBehaviorService(&stubBehaviorRepo{})
+	svc := NewBehaviorService(&stubBehaviorRepo{}, nil)
 	err := svc.Submit(1, false, BehaviorSubmit{ActivityID: 1, BehaviorType: "INVALID"})
 	if err != ErrInvalidBehaviorType {
 		t.Fatalf("want ErrInvalidBehaviorType, got %v", err)
@@ -38,7 +38,7 @@ func TestBehaviorService_Submit_InvalidType(t *testing.T) {
 }
 
 func TestBehaviorService_Submit_ZeroActivityID(t *testing.T) {
-	svc := NewBehaviorService(&stubBehaviorRepo{})
+	svc := NewBehaviorService(&stubBehaviorRepo{}, nil)
 	err := svc.Submit(1, false, BehaviorSubmit{ActivityID: 0, BehaviorType: "VIEW"})
 	if err == nil {
 		t.Fatal("want error for activity_id=0")
@@ -47,7 +47,7 @@ func TestBehaviorService_Submit_ZeroActivityID(t *testing.T) {
 
 func TestBehaviorService_Submit_SyncWrites(t *testing.T) {
 	repo := &stubBehaviorRepo{}
-	svc := NewBehaviorService(repo)
+	svc := NewBehaviorService(repo, nil)
 	if err := svc.Submit(1, false, BehaviorSubmit{ActivityID: 5, BehaviorType: "VIEW"}); err != nil {
 		t.Fatal(err)
 	}
@@ -57,7 +57,7 @@ func TestBehaviorService_Submit_SyncWrites(t *testing.T) {
 }
 
 func TestBehaviorService_SubmitBatch_TooBig(t *testing.T) {
-	svc := NewBehaviorService(&stubBehaviorRepo{})
+	svc := NewBehaviorService(&stubBehaviorRepo{}, nil)
 	items := make([]BehaviorSubmit, behaviorBatchMax+1)
 	for i := range items {
 		items[i] = BehaviorSubmit{ActivityID: 1, BehaviorType: "VIEW"}
@@ -70,7 +70,7 @@ func TestBehaviorService_SubmitBatch_TooBig(t *testing.T) {
 
 func TestBehaviorService_SubmitBatch_Sync(t *testing.T) {
 	repo := &stubBehaviorRepo{}
-	svc := NewBehaviorService(repo)
+	svc := NewBehaviorService(repo, nil)
 	err := svc.SubmitBatch(9, false, []BehaviorSubmit{
 		{ActivityID: 1, BehaviorType: "VIEW"},
 		{ActivityID: 2, BehaviorType: "COLLECT", Detail: map[string]interface{}{"source": "x"}},
@@ -87,7 +87,7 @@ func TestBehaviorService_SubmitBatch_Sync(t *testing.T) {
 }
 
 func TestBehaviorService_SubmitBatch_Empty(t *testing.T) {
-	svc := NewBehaviorService(&stubBehaviorRepo{})
+	svc := NewBehaviorService(&stubBehaviorRepo{}, nil)
 	err := svc.SubmitBatch(1, false, nil)
 	if err != ErrBehaviorBatchEmpty {
 		t.Fatalf("want ErrBehaviorBatchEmpty, got %v", err)

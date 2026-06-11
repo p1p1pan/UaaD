@@ -123,6 +123,57 @@ func TestStockEngine_Rollback(t *testing.T) {
 	}
 }
 
+func TestStockEngine_GetStock(t *testing.T) {
+	rdb := testRedisClient(t)
+	engine := NewStockEngine(rdb)
+	ctx := context.Background()
+
+	const activityID uint64 = 9006
+	if err := engine.WarmUp(ctx, activityID, 12); err != nil {
+		t.Fatalf("warmup: %v", err)
+	}
+
+	remaining, err := engine.GetStock(ctx, activityID)
+	if err != nil {
+		t.Fatalf("GetStock: %v", err)
+	}
+	if remaining != 12 {
+		t.Errorf("stock should be 12, got %d", remaining)
+	}
+}
+
+func TestStockEngine_SetStock_KeepEnrolledSet(t *testing.T) {
+	rdb := testRedisClient(t)
+	engine := NewStockEngine(rdb)
+	ctx := context.Background()
+
+	const activityID uint64 = 9007
+	if err := engine.WarmUp(ctx, activityID, 10); err != nil {
+		t.Fatalf("warmup: %v", err)
+	}
+
+	if _, err := engine.TryEnroll(ctx, activityID, 77); err != nil {
+		t.Fatalf("enroll: %v", err)
+	}
+
+	if err := engine.SetStock(ctx, activityID, 3); err != nil {
+		t.Fatalf("set stock: %v", err)
+	}
+
+	stock, err := engine.GetStock(ctx, activityID)
+	if err != nil {
+		t.Fatalf("get stock: %v", err)
+	}
+	if stock != 3 {
+		t.Fatalf("expected stock=3, got %d", stock)
+	}
+
+	isMember, _ := rdb.SIsMember(ctx, enrolledSetKey(activityID), "77").Result()
+	if !isMember {
+		t.Fatal("expected enrolled_set membership to stay unchanged")
+	}
+}
+
 func TestStockEngine_Concurrent(t *testing.T) {
 	rdb := testRedisClient(t)
 	engine := NewStockEngine(rdb)

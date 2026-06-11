@@ -62,6 +62,9 @@
 - `docs/SYSTEM_DESIGN.md` — API 契约与系统架构
 - `docs/COLLABORATION.md` — 团队冲突预防与流程细节
 - `docs/SRS.md` — 需求规格
+- `docs/DOCS_PROMPTS_GOVERNANCE.md` — 文档与提示词治理入口
+- `.agents/` 是团队 AI 工作流真理源；`.github/*` 与其他工具目录默认作为适配层或分发副本维护
+- 修改 Prompt / Workflow 时，先改真理源，再修入口引用，最后再同步镜像目录
 
 ---
 
